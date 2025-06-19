@@ -48,13 +48,15 @@ impl Grid {
         self.table.get(&pos).copied()
     }
 
-    fn adjacent((x, y): (isize, isize)) -> impl Iterator<Item = (isize, isize)> {
+    fn neighbors(
+        &self,
+        (x, y): (isize, isize),
+    ) -> impl Iterator<Item = (isize, isize, Option<usize>)> {
         const OFFSETS: [(isize, isize); 6] = [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
-        OFFSETS.iter().map(move |(xoff, yoff)| (x + xoff, y + yoff))
-    }
-
-    fn neighbors(&self, (x, y): (isize, isize)) -> impl Iterator<Item = usize> {
-        Self::adjacent((x, y)).filter_map(|(x, y)| self.table.get(&(x, y)).copied())
+        OFFSETS
+            .iter()
+            .map(move |(xoff, yoff)| (x + xoff, y + yoff))
+            .map(|(x, y)| (x, y, self.table.get(&(x, y)).copied()))
     }
 }
 
