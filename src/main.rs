@@ -72,10 +72,10 @@ impl Display for Grid {
                 let x = x * 4 + 2 * y;
                 let y = y * 2;
                 (
-                    isize::min(xmin, x - 2),
-                    isize::min(ymin, y - 2),
-                    isize::max(xmax, x + 2),
-                    isize::max(ymax, y + 2),
+                    isize::min(xmin, x - 1),
+                    isize::min(ymin, y - 1),
+                    isize::max(xmax, x + 1),
+                    isize::max(ymax, y + 1),
                 )
             },
         );
@@ -154,6 +154,11 @@ fn main() -> Result<(), Error> {
     grid.put((0, 1), 1)?;
     grid.put((1, 0), 2)?;
     grid.put((1, 1), 3)?;
+    grid.put((0, 2), 4)?;
+    grid.put((-1, 2), 5)?;
+    grid.put((2, 1), 6)?;
+    grid.put((2, 2), 7)?;
+    grid.put((1, 2), 8)?;
     println!("\n{}\n", grid);
     Ok(())
 }
