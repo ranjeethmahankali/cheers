@@ -1,5 +1,9 @@
-use std::collections::{HashMap, hash_map::Entry};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    fmt::Display,
+};
 
+#[derive(Debug)]
 enum Error {
     AlreadyOccupied(isize, isize),
 }
@@ -60,4 +64,96 @@ impl Grid {
     }
 }
 
-fn main() {}
+impl Display for Grid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (xmin, _ymin, _xmax, _ymax) = self.table.keys().fold(
+            (isize::MAX, isize::MAX, isize::MIN, isize::MIN),
+            |(xmin, ymin, xmax, ymax), (x, y)| {
+                let x = x * 4 + 2 * y;
+                let y = y * 2;
+                (
+                    isize::min(xmin, x - 2),
+                    isize::min(ymin, y - 2),
+                    isize::max(xmax, x + 2),
+                    isize::max(ymax, y + 2),
+                )
+            },
+        );
+        let nodes = {
+            let mut nodes: Vec<(isize, isize, usize)> = self
+                .table
+                .iter()
+                .map(|((x, y), item)| (*x, *y, *item))
+                .collect();
+            nodes.sort_by(|(a, b, _), (c, d, _)| {
+                let a = a + b;
+                let c = c + d;
+                (std::cmp::Reverse(b), a).cmp(&(std::cmp::Reverse(d), c))
+            });
+            nodes
+        };
+        /* Neighbor indices.
+
+             2   1
+              \ /
+           3 - * - 0
+              / \
+             4   5
+        */
+        for row in nodes.chunk_by(|(_ix1, iy1, _item1), (_ix2, iy2, _item2)| iy1 == iy2) {
+            let mut xoff = 0usize;
+            for (ix, iy, item) in row {
+                let next = self.neighbors((*ix, *iy)).next();
+                let x = ((ix * 4 + 2 * iy) - xmin) as usize;
+                for _ in 0..(x - xoff) {
+                    write!(f, " ")?;
+                }
+                write!(
+                    f,
+                    "{:^3}{}",
+                    item,
+                    if let Some((_nx, _ny, Some(_nb))) = next {
+                        "-"
+                    } else {
+                        " "
+                    }
+                )?;
+                xoff = x + 4;
+            }
+            writeln!(f, "")?;
+            // Print the downlinks.
+            xoff = 0usize;
+            for (ix, iy, _item) in row {
+                let mut nbs = self
+                    .neighbors((*ix, *iy))
+                    .skip(4)
+                    .map(|(_, _, item)| item.is_some());
+                let x = ((ix * 4 + 2 * iy) - xmin) as usize;
+                for _ in 0..(x - xoff) {
+                    write!(f, " ")?;
+                }
+                let left = nbs.next().unwrap_or(false);
+                let right = nbs.next().unwrap_or(false);
+                write!(
+                    f,
+                    "{} {} ",
+                    if left { "/" } else { " " },
+                    if right { "\\" } else { " " }
+                )?;
+                xoff = x + 4;
+            }
+            writeln!(f, "")?;
+        }
+        Ok(())
+    }
+}
+
+fn main() -> Result<(), Error> {
+    let mut grid = Grid::default();
+    grid.put((0, 0), 0)?;
+    grid.put((0, 1), 1)?;
+    grid.put((1, 0), 2)?;
+    grid.put((1, 1), 3)?;
+    println!("\n{}\n", grid);
+    Ok(())
+}
