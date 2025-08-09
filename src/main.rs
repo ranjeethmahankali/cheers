@@ -2,10 +2,7 @@ mod graph;
 mod lattice;
 
 use graph::{Graph, TGraph};
-use std::{
-    collections::{HashMap, hash_map::Entry},
-    fmt::Display,
-};
+use std::fmt::Display;
 
 #[derive(Debug)]
 enum Error {
@@ -22,163 +19,10 @@ impl Display for Error {
     }
 }
 
-/*
-The hexagonal grids are stored in a coordinate system where the axes are
-squished together to 60 degrees.
-
-           (0, 1) * ------- * (1, 1)
-                 / \       / \
-                /   \     /   \
-               /     \   /     \
-              /       \ /       \
-      (0, 0) * ------- * ------- * (2, 0)
-            / \     (1, 0)      /
-           /   \     /   \     /
-          /     \   /     \   /
-         /       \ /       \ /
-        * ------- * ------- *
-    (0, -1)     (1, -1)     (2, -1)
-
-This is because a hexagonal grid and a rectangular grid are topologically
-equivalent. The only difference is that, in the convention of the above diagram,
-the diagonal in the (-1, 1) direction and the diagonal (1, -1) are considered
-neighbors of the point in the middle. This means I can store the points in a
-rectangular grid, and infer the connectivity from the indices.
- */
-
-#[derive(Default)]
-struct HashMapLattice {
-    table: HashMap<(isize, isize), usize>,
-}
-
-impl HashMapLattice {
-    fn put(&mut self, (x, y): (isize, isize), item: usize) -> Result<(), Error> {
-        match self.table.entry((x, y)) {
-            Entry::Occupied(_) => Err(Error::AlreadyOccupied(x, y)),
-            Entry::Vacant(slot) => {
-                slot.insert(item);
-                Ok(())
-            }
-        }
-    }
-
-    fn get(&self, pos: (isize, isize)) -> Option<usize> {
-        self.table.get(&pos).copied()
-    }
-
-    fn neighbors(
-        &self,
-        (x, y): (isize, isize),
-    ) -> impl Iterator<Item = (isize, isize, Option<usize>)> {
-        const OFFSETS: [(isize, isize); 6] = [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
-        OFFSETS
-            .iter()
-            .map(move |(xoff, yoff)| (x + xoff, y + yoff))
-            .map(|(x, y)| (x, y, self.table.get(&(x, y)).copied()))
-    }
-}
-
-impl Display for HashMapLattice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let (xmin, _ymin, _xmax, _ymax) = self.table.keys().fold(
-            (isize::MAX, isize::MAX, isize::MIN, isize::MIN),
-            |(xmin, ymin, xmax, ymax), (x, y)| {
-                let x = x * 4 + 2 * y;
-                let y = y * 2;
-                (
-                    isize::min(xmin, x - 1),
-                    isize::min(ymin, y - 1),
-                    isize::max(xmax, x + 1),
-                    isize::max(ymax, y + 1),
-                )
-            },
-        );
-        let nodes = {
-            let mut nodes: Vec<(isize, isize, usize)> = self
-                .table
-                .iter()
-                .map(|((x, y), item)| (*x, *y, *item))
-                .collect();
-            nodes.sort_by(|(a, b, _), (c, d, _)| {
-                let a = a + b;
-                let c = c + d;
-                (std::cmp::Reverse(b), a).cmp(&(std::cmp::Reverse(d), c))
-            });
-            nodes
-        };
-        /* Neighbor indices.
-
-            2   1
-             \ /
-          3 - * - 0
-             / \
-            4   5
-        */
-        println!("{:?}", nodes);
-        for row in nodes.chunk_by(|(_ix1, iy1, _item1), (_ix2, iy2, _item2)| iy1 == iy2) {
-            let mut xoff = 0usize;
-            for (ix, iy, item) in row {
-                let next = self.neighbors((*ix, *iy)).next();
-                let x = ((ix * 4 + 2 * iy) - xmin) as usize;
-                for _ in 0..(x - xoff) {
-                    write!(f, " ")?;
-                }
-                write!(
-                    f,
-                    "{:^3}{}",
-                    item,
-                    if let Some((_nx, _ny, Some(_nb))) = next {
-                        "-"
-                    } else {
-                        " "
-                    }
-                )?;
-                xoff = x + 4;
-            }
-            writeln!(f, "")?;
-            // Print the downlinks.
-            xoff = 0usize;
-            for (ix, iy, _item) in row {
-                let mut nbs = self
-                    .neighbors((*ix, *iy))
-                    .skip(4)
-                    .map(|(_, _, item)| item.is_some());
-                let x = ((ix * 4 + 2 * iy) - xmin) as usize;
-                for _ in 0..(x - xoff) {
-                    write!(f, " ")?;
-                }
-                let left = nbs.next().unwrap_or(false);
-                let right = nbs.next().unwrap_or(false);
-                write!(
-                    f,
-                    "{} {} ",
-                    if left { "/" } else { " " },
-                    if right { "\\" } else { " " }
-                )?;
-                xoff = x + 4;
-            }
-            writeln!(f, "")?;
-        }
-        Ok(())
-    }
-}
-
 fn main() -> Result<(), Error> {
-    let mut lattice = HashMapLattice::default();
-    lattice.put((0, 0), 0)?;
-    lattice.put((0, 1), 1)?;
-    lattice.put((1, 0), 2)?;
-    lattice.put((1, 1), 3)?;
-    lattice.put((0, 2), 4)?;
-    lattice.put((-1, 2), 5)?;
-    lattice.put((2, 1), 6)?;
-    lattice.put((2, 2), 7)?;
-    lattice.put((1, 2), 8)?;
-    println!("HashMapLattice:\n{}\n", lattice);
+    use lattice::{Direction, *};
 
-    let mut our_lattice = lattice::Lattice::new(9);
-    use lattice::Direction;
-
+    let mut our_lattice = Lattice::new(9);
     our_lattice.insert(0, Direction::TOP_RIGHT, 1);
     our_lattice.insert(0, Direction::RIGHT, 2);
     our_lattice.insert(1, Direction::RIGHT, 3);
