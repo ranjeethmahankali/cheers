@@ -8,6 +8,14 @@ enum Error {
     AlreadyOccupied(isize, isize),
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Error::AlreadyOccupied(x, y) => write!(f, "Position ({}, {}) is already occupied", x, y),
+        }
+    }
+}
+
 /*
 The hexagonal grids are stored in a coordinate system where the axes are
 squished together to 60 degrees.
