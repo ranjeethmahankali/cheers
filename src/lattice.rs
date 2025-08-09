@@ -1,0 +1,558 @@
+use std::{
+    num::NonZeroU32,
+    ops::{Index, IndexMut},
+};
+
+// Slot where a vertex maybe stored. The nonzerou32 stuff is to optimize the storage
+// for the two states when the vertex does and does not exist in the slot.
+#[repr(transparent)]
+#[derive(Copy, Clone)]
+struct Neighbor(Option<NonZeroU32>);
+
+impl Default for Neighbor {
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl Neighbor {
+    fn put(&mut self, id: u32) {
+        self.0 = NonZeroU32::new(id ^ u32::MAX);
+    }
+
+    fn get(&self) -> Option<u32> {
+        self.0.map(|v| v.get() ^ u32::MAX)
+    }
+
+    fn clear(&mut self) {
+        self.0 = None;
+    }
+}
+
+pub struct Lattice {
+    conn: Box<[[Neighbor; 6]]>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct Direction(u8);
+
+impl Direction {
+    pub const RIGHT: Self = Self(0);
+    pub const TOP_RIGHT: Self = Self(1);
+    pub const TOP_LEFT: Self = Self(2);
+    pub const LEFT: Self = Self(3);
+    pub const BOTTOM_LEFT: Self = Self(4);
+    pub const BOTTOM_RIGHT: Self = Self(5);
+
+    const ALL_CCW: [Direction; 6] = [
+        Direction::RIGHT,
+        Direction::TOP_RIGHT,
+        Direction::TOP_LEFT,
+        Direction::LEFT,
+        Direction::BOTTOM_LEFT,
+        Direction::BOTTOM_RIGHT,
+    ];
+
+    const fn opposite(self) -> Self {
+        Self((self.0 + 3) % 6)
+    }
+
+    const fn rotate_cw(self) -> Self {
+        Self((self.0 + 1) % 6)
+    }
+
+    const fn rotate_ccw(self) -> Self {
+        Self((self.0 + 5) % 6)
+    }
+
+    const fn offset(&self) -> (isize, isize) {
+        const OFFSETS: [(isize, isize); 6] = [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
+        return OFFSETS[self.0 as usize];
+    }
+}
+
+impl Index<Direction> for [Neighbor; 6] {
+    type Output = Neighbor;
+
+    fn index(&self, dir: Direction) -> &Self::Output {
+        &self[dir.0 as usize]
+    }
+}
+
+impl IndexMut<Direction> for [Neighbor; 6] {
+    fn index_mut(&mut self, dir: Direction) -> &mut Self::Output {
+        &mut self[dir.0 as usize]
+    }
+}
+
+impl Lattice {
+    pub fn new(num_nodes: usize) -> Self {
+        Self {
+            conn: vec![Default::default(); num_nodes].into_boxed_slice(),
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.conn.len()
+    }
+
+    fn step_loop_ccw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
+        let nb = self.neighbor(node_id, direction)?;
+        let stop = direction.opposite();
+        let mut dir = direction.opposite().rotate_ccw();
+        let mut rotations = 1;
+        while dir != stop {
+            if self.neighbor(nb, dir).is_some() {
+                return Some((nb, dir, rotations));
+            }
+            dir = dir.rotate_ccw();
+            rotations += 1;
+        }
+        None
+    }
+
+    fn step_loop_cw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
+        let nb = self.neighbor(node_id, direction)?;
+        let stop = direction.opposite();
+        let mut dir = direction.opposite().rotate_cw();
+        let mut rotations = 1;
+        while dir != stop {
+            if self.neighbor(nb, dir).is_some() {
+                return Some((nb, dir, rotations));
+            }
+            dir = dir.rotate_cw();
+            rotations += 1;
+        }
+        None
+    }
+
+    fn neighbor(&self, from: u32, dir: Direction) -> Option<u32> {
+        self.conn[from as usize][dir].get()
+    }
+
+    fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
+        self.conn[id as usize].iter().filter_map(|n| n.get())
+    }
+
+    fn neighbors_with_dirs(&self, id: u32) -> impl Iterator<Item = (u32, Direction)> {
+        self.conn[id as usize]
+            .iter()
+            .zip(Direction::ALL_CCW.iter())
+            .filter_map(|(n, &d)| n.get().map(|n| (n, d)))
+    }
+
+    fn contains(&self, id: u32) -> bool {
+        self.neighbors(id).next().is_some()
+    }
+
+    pub fn remove(&mut self, id: u32) {
+        let mut nbs = [u32::MAX; 6];
+        let mut dirs = [Direction::RIGHT; 6];
+        let mut count = 0usize;
+        // Collect them first, to avoid borrowing and modifying
+        for (nb, dir) in self.conn[id as usize].iter().zip(Direction::ALL_CCW) {
+            if let Some(nb) = nb.get() {
+                nbs[count] = nb;
+                dirs[count] = dir;
+                count += 1;
+            }
+        }
+        for (&nb, &dir) in nbs.iter().zip(dirs.iter()).take(count) {
+            self.conn[id as usize][dir].clear();
+            self.conn[nb as usize][dir.opposite()].clear();
+        }
+    }
+
+    pub fn insert(&mut self, id: u32, dir: Direction, newid: u32) {
+        if id == newid {
+            return;
+        }
+        // Remove if something was there.
+        if let Some(nb) = self.neighbor(id, dir) {
+            self.remove(nb);
+        }
+        // Now insert.
+        self.conn[id as usize][dir].put(newid);
+        self.conn[newid as usize][dir.opposite()].put(id);
+        {
+            // Orbit the loop clockwise and link nodes.
+            let mut id = id;
+            let mut dir = dir.rotate_ccw();
+            while let Some(next) = self.neighbor(id, dir) {
+                dir = dir.opposite().rotate_ccw();
+                self.conn[next as usize][dir].put(newid);
+                self.conn[newid as usize][dir.opposite()].put(next);
+                dir = dir.rotate_ccw();
+                id = next;
+            }
+        }
+        {
+            // Orbit the loop counter clock wise direction.
+            // This may not be required depending on how far the other loop went, but leaving this in for now.
+            // Will think about it if it becomes a bottlneck.
+            let mut id = id;
+            let mut dir = dir.rotate_cw();
+            while let Some(next) = self.neighbor(id, dir) {
+                dir = dir.opposite().rotate_cw();
+                self.conn[next as usize][dir].put(newid);
+                self.conn[newid as usize][dir.opposite()].put(next);
+                dir = dir.rotate_cw();
+                id = next;
+            }
+        }
+    }
+
+    /// Return the empty slot with the highest valence and it's neighbors.
+    fn best_empty_slot() -> ((u32, Direction), [Neighbor; 6]) {
+        todo!("Not Implemented")
+    }
+}
+
+impl std::fmt::Display for Lattice {
+    /*
+    The hexagonal grids are stored in a coordinate system where the axes are
+    squished together to 60 degrees.
+
+               (0, 1) * ------- * (1, 1)
+                     / \       / \
+                    /   \     /   \
+                   /     \   /     \
+                  /       \ /       \
+          (0, 0) * ------- * ------- * (2, 0)
+                / \     (1, 0)      /
+               /   \     /   \     /
+              /     \   /     \   /
+             /       \ /       \ /
+            * ------- * ------- *
+        (0, -1)     (1, -1)     (2, -1)
+
+    This is because a hexagonal grid and a rectangular grid are topologically
+    equivalent. The only difference is that, in the convention of the above diagram,
+    the diagonal in the (-1, 1) direction and the diagonal (1, -1) are considered
+    neighbors of the point in the middle. This means I can store the points in a
+    rectangular grid, and infer the connectivity from the indices.
+     */
+
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut visited = vec![false; self.conn.len()];
+        let mut stack = Vec::new();
+        let mut component_nodes = Vec::new();
+        for start_node in 0..self.conn.len() {
+            if std::mem::replace(&mut visited[start_node], true)
+                || !self.contains(start_node as u32)
+            {
+                continue;
+            }
+            component_nodes.clear();
+            stack.clear();
+            stack.push((start_node as u32, 0isize, 0isize));
+            while let Some((node, x, y)) = stack.pop() {
+                component_nodes.push((x, y, node));
+                for (neighbor, dir) in self.neighbors_with_dirs(node) {
+                    if !std::mem::replace(&mut visited[neighbor as usize], true) {
+                        let (dx, dy) = dir.offset();
+                        stack.push((neighbor, x + dx, y + dy));
+                    }
+                }
+            }
+            component_nodes.sort_by(|(ax, ay, _), (cx, cy, _)| {
+                (std::cmp::Reverse(ay), ax + ay).cmp(&(std::cmp::Reverse(cy), cx + cy))
+            });
+            let (xmin, _ymin, _xmax, _ymax) = component_nodes.iter().fold(
+                (isize::MAX, isize::MAX, isize::MIN, isize::MIN),
+                |(xmin, ymin, xmax, ymax), &(x, y, _)| {
+                    let x = x * 4 + 2 * y;
+                    let y = y * 2;
+                    (
+                        xmin.min(x - 1),
+                        ymin.min(y - 1),
+                        xmax.max(x + 1),
+                        ymax.max(y + 1),
+                    )
+                },
+            );
+            for row in component_nodes.chunk_by(|(_, ay1, _), (_, ay2, _)| ay1 == ay2) {
+                let mut xoff = 0usize;
+                for &(ix, iy, node) in row {
+                    let has_right = self.neighbor(node, Direction::RIGHT).is_some();
+                    let x = ((ix * 4 + 2 * iy) - xmin) as usize;
+                    for _ in 0..(x - xoff) {
+                        write!(f, " ")?;
+                    }
+                    write!(f, "{:^3}{}", node, if has_right { "-" } else { " " })?;
+                    xoff = x + 4;
+                }
+                writeln!(f)?;
+                xoff = 0;
+                for &(ix, iy, node) in row {
+                    let has_bottom_left = self.neighbor(node, Direction::BOTTOM_LEFT).is_some();
+                    let has_bottom_right = self.neighbor(node, Direction::BOTTOM_RIGHT).is_some();
+                    let x = ((ix * 4 + 2 * iy) - xmin) as usize;
+                    for _ in 0..(x - xoff) {
+                        write!(f, " ")?;
+                    }
+                    write!(
+                        f,
+                        "{} {} ",
+                        if has_bottom_left { "/" } else { " " },
+                        if has_bottom_right { "\\" } else { " " }
+                    )?;
+                    xoff = x + 4;
+                }
+                writeln!(f)?;
+            }
+            writeln!(f)?;
+        }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    /// Check lattice for consistency - verifies all lattice invariants
+    fn check_lattice_consistency(lattice: &Lattice) {
+        for node in 0u32..(lattice.len() as u32) {
+            // Skip empty nodes
+            if !lattice.contains(node) {
+                continue;
+            }
+            // Check bidirectional connections
+            for dir in Direction::ALL_CCW {
+                if let Some(neighbor_id) = lattice.neighbor(node, dir) {
+                    // Verify neighbor points back to this node
+                    let back_neighbor = lattice.neighbor(neighbor_id, dir.opposite());
+                    assert_eq!(
+                        back_neighbor,
+                        Some(node),
+                        "Node {} has neighbor {} in direction {:?}, but neighbor {} doesn't point back (has {:?} instead of Some({}))",
+                        node,
+                        neighbor_id,
+                        dir,
+                        neighbor_id,
+                        back_neighbor,
+                        node
+                    );
+                    // Verify neighbor exists in lattice
+                    assert!(
+                        lattice.contains(neighbor_id),
+                        "Node {} has neighbor {} in direction {:?}, but neighbor {} doesn't exist in lattice",
+                        node,
+                        neighbor_id,
+                        dir,
+                        neighbor_id
+                    );
+                }
+            }
+            // Check triangular loops using step_loop functions
+            for (_, dir) in lattice.neighbors_with_dirs(node) {
+                if let Some((last, _)) = (0..3).fold(Some((node, dir)), |current, _| {
+                    if let Some((id, dir)) = current
+                        && let Some((next, ndir, nrot)) = lattice.step_loop_cw(id, dir)
+                        && nrot == 1
+                    {
+                        Some((next, ndir))
+                    } else {
+                        None
+                    }
+                }) {
+                    assert_eq!(last, node);
+                }
+                if let Some((last, _)) = (0..3).fold(Some((node, dir)), |current, _| {
+                    if let Some((id, dir)) = current
+                        && let Some((next, ndir, nrot)) = lattice.step_loop_ccw(id, dir)
+                        && nrot == 1
+                    {
+                        Some((next, ndir))
+                    } else {
+                        None
+                    }
+                }) {
+                    assert_eq!(last, node);
+                }
+            }
+            // Check that no node references itself as a neighbor
+            for neighbor in lattice.neighbors(node) {
+                assert_ne!(neighbor, node, "Node {} has itself as a neighbor", node);
+            }
+        }
+    }
+
+    #[test]
+    fn test_neighbor_put_get() {
+        let test_values = [0, 1, 42, 1000, u32::MAX / 2, u32::MAX - 1];
+
+        for &id in &test_values {
+            let mut neighbor = Neighbor::default();
+            assert!(!neighbor.get().is_some());
+            neighbor.put(id);
+            assert_eq!(neighbor.get(), Some(id));
+        }
+    }
+
+    #[test]
+    fn test_neighbor_max_value_edge_case() {
+        let mut neighbor = Neighbor::default();
+        neighbor.put(u32::MAX);
+        assert!(neighbor.get().is_none());
+    }
+
+    #[test]
+    fn test_neighbor_overwrite() {
+        let mut neighbor = Neighbor::default();
+        neighbor.put(42);
+        assert_eq!(neighbor.get(), Some(42));
+        neighbor.put(0);
+        assert_eq!(neighbor.get(), Some(0));
+    }
+
+    #[test]
+    fn test_print_empty_lattice() {
+        let lattice = Lattice::new(5);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn test_print_single_node_lattice() {
+        let mut lattice = Lattice::new(1);
+        // Insert node 0 to itself to create a self-loop
+        lattice.insert(0, Direction::RIGHT, 0); // Has no effect.
+        check_lattice_consistency(&lattice);
+        assert!(format!("{}", lattice).is_empty());
+    }
+
+    #[test]
+    fn test_print_two_node_connection() {
+        let mut lattice = Lattice::new(2);
+        lattice.insert(0, Direction::RIGHT, 1);
+        check_lattice_consistency(&lattice);
+        assert_eq!(format!("{}", lattice).trim(), "0 - 1");
+    }
+
+    #[test]
+    fn test_print_triangle_formation() {
+        let mut lattice = Lattice::new(3);
+        // First connect two nodes
+        lattice.insert(0, Direction::RIGHT, 1);
+        // Then insert the third node to form a triangle
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 1 "));
+        assert!(output.contains(" 2 "));
+        // Should have connections
+        assert!(output.contains("-"));
+        assert!(output.contains("/") || output.contains("\\"));
+    }
+
+    #[test]
+    fn test_print_linear_chain() {
+        let mut lattice = Lattice::new(4);
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(1, Direction::RIGHT, 2);
+        lattice.insert(2, Direction::RIGHT, 3);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        for i in 0..4 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should have multiple horizontal connections
+        let dash_count = output.matches("-").count();
+        assert!(!output.contains("/") && !output.contains("\\"));
+        assert!(dash_count >= 3);
+    }
+
+    #[test]
+    fn test_print_disjoint_components() {
+        let mut lattice = Lattice::new(6);
+        // Create first triangle component
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        // Create second linear component
+        lattice.insert(3, Direction::RIGHT, 4);
+        lattice.insert(4, Direction::RIGHT, 5);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        // All nodes should be present
+        for i in 0..6 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should have multiple component separations (empty lines between components)
+        let component_separations = output.matches("\n\n").count();
+        assert!(component_separations >= 2);
+    }
+
+    #[test]
+    fn test_print_mixed_components() {
+        let mut lattice = Lattice::new(5);
+        // Build mixed triangle and linear components
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        // Create a separate small component
+        lattice.insert(3, Direction::RIGHT, 4);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        // All nodes should be present
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 1 "));
+        assert!(output.contains(" 2 "));
+        assert!(output.contains(" 3 "));
+        assert!(output.contains(" 4 "));
+        // Should have both horizontal and diagonal connections
+        assert!(output.contains("-")); // horizontal
+        assert!(output.contains("/") || output.contains("\\")); // diagonals
+    }
+
+    #[test]
+    fn test_print_star_pattern() {
+        let mut lattice = Lattice::new(7);
+        // Create star pattern with center node connected in all directions
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        lattice.insert(0, Direction::TOP_LEFT, 3);
+        lattice.insert(0, Direction::LEFT, 4);
+        lattice.insert(0, Direction::BOTTOM_LEFT, 5);
+        lattice.insert(0, Direction::BOTTOM_RIGHT, 6);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        // All nodes in star pattern should be present
+        for i in 0..7 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should contain all connection types in star pattern
+        assert!(output.contains("-")); // horizontal connections
+        assert!(output.contains("/")); // diagonal connections
+        assert!(output.contains("\\")); // diagonal connections
+    }
+
+    #[test]
+    fn test_print_non_contiguous_nodes() {
+        let mut lattice = Lattice::new(10);
+        // Test lattice with gaps in node IDs
+        lattice.insert(0, Direction::RIGHT, 2);
+        lattice.insert(2, Direction::TOP_RIGHT, 5);
+        // Separate component with high node IDs
+        lattice.insert(7, Direction::RIGHT, 9);
+        check_lattice_consistency(&lattice);
+        let output = format!("{}", lattice);
+        // Should contain only the nodes that were actually connected
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 2 "));
+        assert!(output.contains(" 5 "));
+        assert!(output.contains(" 7 "));
+        assert!(output.contains(" 9 "));
+        // Should not contain the skipped node IDs
+        assert!(!output.contains(" 1 "));
+        assert!(!output.contains(" 3 "));
+        assert!(!output.contains(" 4 "));
+        assert!(!output.contains(" 6 "));
+        assert!(!output.contains(" 8 "));
+        // Should have component separation
+        let component_separations = output.matches("\n\n").count();
+        assert!(component_separations >= 2);
+    }
+}
