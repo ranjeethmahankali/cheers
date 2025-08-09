@@ -160,6 +160,9 @@ impl Lattice {
     }
 
     pub fn insert(&mut self, id: u32, dir: Direction, newid: u32) {
+        if id == newid {
+            return;
+        }
         // Remove if something was there.
         if let Some(nb) = self.neighbor(id, dir) {
             self.remove(nb);
@@ -302,11 +305,149 @@ mod test {
     #[test]
     fn test_neighbor_overwrite() {
         let mut neighbor = Neighbor::default();
-
         neighbor.put(42);
         assert_eq!(neighbor.get(), Some(42));
-
         neighbor.put(0);
         assert_eq!(neighbor.get(), Some(0));
+    }
+
+    #[test]
+    fn test_print_empty_lattice() {
+        let lattice = Lattice::new(5);
+        let output = format!("{}", lattice);
+        assert_eq!(output, "");
+    }
+
+    #[test]
+    fn test_print_single_node_lattice() {
+        let mut lattice = Lattice::new(1);
+        // Insert node 0 to itself to create a self-loop
+        lattice.insert(0, Direction::RIGHT, 0); // Has no effect.
+        assert!(format!("{}", lattice).is_empty());
+    }
+
+    #[test]
+    fn test_print_two_node_connection() {
+        let mut lattice = Lattice::new(2);
+        lattice.insert(0, Direction::RIGHT, 1);
+        assert_eq!(format!("{}", lattice).trim(), "0 - 1");
+    }
+
+    #[test]
+    fn test_print_triangle_formation() {
+        let mut lattice = Lattice::new(3);
+        // First connect two nodes
+        lattice.insert(0, Direction::RIGHT, 1);
+        // Then insert the third node to form a triangle
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        let output = format!("{}", lattice);
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 1 "));
+        assert!(output.contains(" 2 "));
+        // Should have connections
+        assert!(output.contains("-"));
+        assert!(output.contains("/") || output.contains("\\"));
+    }
+
+    #[test]
+    fn test_print_linear_chain() {
+        let mut lattice = Lattice::new(4);
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(1, Direction::RIGHT, 2);
+        lattice.insert(2, Direction::RIGHT, 3);
+        let output = format!("{}", lattice);
+        for i in 0..4 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should have multiple horizontal connections
+        let dash_count = output.matches("-").count();
+        assert!(!output.contains("/") && !output.contains("\\"));
+        assert!(dash_count >= 3);
+    }
+
+    #[test]
+    fn test_print_disjoint_components() {
+        let mut lattice = Lattice::new(6);
+        // Create first triangle component
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        // Create second linear component
+        lattice.insert(3, Direction::RIGHT, 4);
+        lattice.insert(4, Direction::RIGHT, 5);
+        let output = format!("{}", lattice);
+        // All nodes should be present
+        for i in 0..6 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should have multiple component separations (empty lines between components)
+        let component_separations = output.matches("\n\n").count();
+        assert!(component_separations >= 2);
+    }
+
+    #[test]
+    fn test_print_mixed_components() {
+        let mut lattice = Lattice::new(5);
+        // Build mixed triangle and linear components
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        // Create a separate small component
+        lattice.insert(3, Direction::RIGHT, 4);
+        let output = format!("{}", lattice);
+        // All nodes should be present
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 1 "));
+        assert!(output.contains(" 2 "));
+        assert!(output.contains(" 3 "));
+        assert!(output.contains(" 4 "));
+        // Should have both horizontal and diagonal connections
+        assert!(output.contains("-")); // horizontal
+        assert!(output.contains("/") || output.contains("\\")); // diagonals
+    }
+
+    #[test]
+    fn test_print_star_pattern() {
+        let mut lattice = Lattice::new(7);
+        // Create star pattern with center node connected in all directions
+        lattice.insert(0, Direction::RIGHT, 1);
+        lattice.insert(0, Direction::TOP_RIGHT, 2);
+        lattice.insert(0, Direction::TOP_LEFT, 3);
+        lattice.insert(0, Direction::LEFT, 4);
+        lattice.insert(0, Direction::BOTTOM_LEFT, 5);
+        lattice.insert(0, Direction::BOTTOM_RIGHT, 6);
+        let output = format!("{}", lattice);
+        // All nodes in star pattern should be present
+        for i in 0..7 {
+            assert!(output.contains(&format!(" {} ", i)));
+        }
+        // Should contain all connection types in star pattern
+        assert!(output.contains("-")); // horizontal connections
+        assert!(output.contains("/")); // diagonal connections
+        assert!(output.contains("\\")); // diagonal connections
+    }
+
+    #[test]
+    fn test_print_non_contiguous_nodes() {
+        let mut lattice = Lattice::new(10);
+        // Test lattice with gaps in node IDs
+        lattice.insert(0, Direction::RIGHT, 2);
+        lattice.insert(2, Direction::TOP_RIGHT, 5);
+        // Separate component with high node IDs
+        lattice.insert(7, Direction::RIGHT, 9);
+        let output = format!("{}", lattice);
+        // Should contain only the nodes that were actually connected
+        assert!(output.contains(" 0 "));
+        assert!(output.contains(" 2 "));
+        assert!(output.contains(" 5 "));
+        assert!(output.contains(" 7 "));
+        assert!(output.contains(" 9 "));
+        // Should not contain the skipped node IDs
+        assert!(!output.contains(" 1 "));
+        assert!(!output.contains(" 3 "));
+        assert!(!output.contains(" 4 "));
+        assert!(!output.contains(" 6 "));
+        assert!(!output.contains(" 8 "));
+        // Should have component separation
+        let component_separations = output.matches("\n\n").count();
+        assert!(component_separations >= 2);
     }
 }
