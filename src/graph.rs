@@ -94,12 +94,36 @@ impl Display for Graph {
         } else {
             (self.n - 1).to_string().len()
         };
-        // Top border - account for row label width
-        write!(f, "{:width$}┌", "", width = max_digits + 1)?;
+        // Top border - close the row label area and connect to main area
+        write!(f, "┌{:─<width$}┬", "", width = max_digits)?;
         for _j in 0..self.n {
             write!(f, "─")?;
         }
         writeln!(f, "┐")?;
+        // Print each row with row labels and borders (only bottom-right triangle)
+        for i in 0..self.n {
+            write!(f, "│{:width$}│", i, width = max_digits)?;
+            for j in 0..=i {
+                if i == j {
+                    write!(f, " ")?; // Diagonal (self-loops don't exist)
+                } else if self.has_edge(i, j) {
+                    write!(f, "x")?; // Edge exists
+                } else {
+                    write!(f, " ")?; // No edge
+                }
+            }
+            // Fill remaining space to align with full width
+            for _j in (i + 1)..self.n {
+                write!(f, " ")?;
+            }
+            writeln!(f, "│")?;
+        }
+        // Bottom border of row label area and separator to column labels
+        write!(f, "└{:─<width$}┼", "", width = max_digits)?;
+        for _j in 0..self.n {
+            write!(f, "─")?;
+        }
+        writeln!(f, "┤")?;
         // Column headers - print digits vertically, bottom-aligned (least significant digit closest to table)
         for digit_pos in 0..max_digits {
             write!(f, "{:width$}│", "", width = max_digits + 1)?;
@@ -109,28 +133,8 @@ impl Display for Graph {
             }
             writeln!(f, "│")?;
         }
-        // Separator line
-        write!(f, "{:─<width$}┼", "", width = max_digits + 1)?;
-        for _j in 0..self.n {
-            write!(f, "─")?;
-        }
-        writeln!(f, "┤")?;
-        // Print each row with row labels and borders
-        for i in 0..self.n {
-            write!(f, "│{:width$}│", i, width = max_digits)?;
-            for j in 0..self.n {
-                if i == j {
-                    write!(f, " ")?; // Diagonal (self-loops don't exist)
-                } else if self.has_edge(i, j) {
-                    write!(f, "x")?; // Edge exists
-                } else {
-                    write!(f, " ")?; // No edge
-                }
-            }
-            writeln!(f, "│")?;
-        }
         // Bottom border
-        write!(f, "{:─<width$}┴", "", width = max_digits + 1)?;
+        write!(f, "{:width$}└", "", width = max_digits + 1)?;
         for _j in 0..self.n {
             write!(f, "─")?;
         }
