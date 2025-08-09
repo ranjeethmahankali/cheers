@@ -35,11 +35,13 @@ fn main() -> Result<(), Error> {
     println!("Our Lattice:\n{}\n", our_lattice);
 
     // Test the graph
-    let mut graph = Graph::new_complete(4);
+    let mut graph = Graph::new_complete(12);
     println!("{}", graph);
 
     graph.remove_edge(0, 1);
-    println!("After removing edge 0-1:");
+    graph.remove_edge(5, 7);
+    graph.remove_edge(9, 11);
+    println!("After removing some edges:");
     println!("{}", graph);
 
     Ok(())

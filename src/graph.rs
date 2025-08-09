@@ -88,30 +88,36 @@ impl Display for Graph {
             self.n,
             self.edge_count()
         )?;
-
-        // Top border with column headers
-        write!(f, "  ┌")?;
-        for j in 0..self.n {
+        // Calculate how many digits we need for the largest number
+        let max_digits = if self.n == 0 {
+            1
+        } else {
+            (self.n - 1).to_string().len()
+        };
+        // Top border - account for row label width
+        write!(f, "{:width$}┌", "", width = max_digits + 1)?;
+        for _j in 0..self.n {
             write!(f, "─")?;
         }
         writeln!(f, "┐")?;
-
-        write!(f, "  │")?;
-        for j in 0..self.n {
-            write!(f, "{}", j)?;
+        // Column headers - print digits vertically, bottom-aligned (least significant digit closest to table)
+        for digit_pos in 0..max_digits {
+            write!(f, "{:width$}│", "", width = max_digits + 1)?;
+            for j in 0..self.n {
+                let j_str = format!("{:0width$}", j, width = max_digits);
+                write!(f, "{}", j_str.chars().nth(digit_pos).unwrap())?;
+            }
+            writeln!(f, "│")?;
         }
-        writeln!(f, "│")?;
-
         // Separator line
-        write!(f, "┌─┼")?;
-        for j in 0..self.n {
+        write!(f, "{:─<width$}┼", "", width = max_digits + 1)?;
+        for _j in 0..self.n {
             write!(f, "─")?;
         }
         writeln!(f, "┤")?;
-
         // Print each row with row labels and borders
         for i in 0..self.n {
-            write!(f, "│{}│", i)?;
+            write!(f, "│{:width$}│", i, width = max_digits)?;
             for j in 0..self.n {
                 if i == j {
                     write!(f, " ")?; // Diagonal (self-loops don't exist)
@@ -123,14 +129,12 @@ impl Display for Graph {
             }
             writeln!(f, "│")?;
         }
-
         // Bottom border
-        write!(f, "└─┴")?;
-        for j in 0..self.n {
+        write!(f, "{:─<width$}┴", "", width = max_digits + 1)?;
+        for _j in 0..self.n {
             write!(f, "─")?;
         }
         writeln!(f, "┘")?;
-
         Ok(())
     }
 }
