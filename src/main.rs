@@ -108,12 +108,13 @@ impl Display for HashMapLattice {
         };
         /* Neighbor indices.
 
-             2   1
-              \ /
-           3 - * - 0
-              / \
-             4   5
+            2   1
+             \ /
+          3 - * - 0
+             / \
+            4   5
         */
+        println!("{:?}", nodes);
         for row in nodes.chunk_by(|(_ix1, iy1, _item1), (_ix2, iy2, _item2)| iy1 == iy2) {
             let mut xoff = 0usize;
             for (ix, iy, item) in row {
@@ -173,7 +174,21 @@ fn main() -> Result<(), Error> {
     lattice.put((2, 1), 6)?;
     lattice.put((2, 2), 7)?;
     lattice.put((1, 2), 8)?;
-    println!("\n{}\n", lattice);
+    println!("HashMapLattice:\n{}\n", lattice);
+
+    let mut our_lattice = lattice::Lattice::new(9);
+    use lattice::Direction;
+
+    our_lattice.insert(0, Direction::TOP_RIGHT, 1);
+    our_lattice.insert(0, Direction::RIGHT, 2);
+    our_lattice.insert(1, Direction::RIGHT, 3);
+    our_lattice.insert(1, Direction::TOP_RIGHT, 4);
+    our_lattice.insert(1, Direction::TOP_LEFT, 5);
+    our_lattice.insert(3, Direction::RIGHT, 6);
+    our_lattice.insert(3, Direction::TOP_RIGHT, 8);
+    our_lattice.insert(6, Direction::TOP_RIGHT, 7);
+
+    println!("Our Lattice:\n{}\n", our_lattice);
 
     // Test the graph
     let mut graph = Graph::new_complete(4);
