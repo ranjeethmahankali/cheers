@@ -27,10 +27,6 @@ impl Neighbor {
     fn clear(&mut self) {
         self.0 = None;
     }
-
-    fn exists(&self) -> bool {
-        self.0.is_some()
-    }
 }
 
 pub struct Lattice {
@@ -102,7 +98,7 @@ impl Lattice {
         let mut dir = direction.opposite().rotate_ccw();
         let mut rotations = 1;
         while dir != stop {
-            if self.conn[nb as usize][dir].exists() {
+            if self.neighbor(nb, dir).is_some() {
                 return Some((nb, dir, rotations));
             }
             dir = dir.rotate_ccw();
@@ -117,7 +113,7 @@ impl Lattice {
         let mut dir = direction.opposite().rotate_cw();
         let mut rotations = 1;
         while dir != stop {
-            if self.conn[nb as usize][dir].exists() {
+            if self.neighbor(nb, dir).is_some() {
                 return Some((nb, dir, rotations));
             }
             dir = dir.rotate_cw();
@@ -290,11 +286,8 @@ mod test {
 
         for &id in &test_values {
             let mut neighbor = Neighbor::default();
-            assert!(!neighbor.exists());
-            assert_eq!(neighbor.get(), None);
-
+            assert!(!neighbor.get().is_some());
             neighbor.put(id);
-            assert!(neighbor.exists());
             assert_eq!(neighbor.get(), Some(id));
         }
     }
@@ -303,8 +296,7 @@ mod test {
     fn test_neighbor_max_value_edge_case() {
         let mut neighbor = Neighbor::default();
         neighbor.put(u32::MAX);
-        assert!(!neighbor.exists());
-        assert_eq!(neighbor.get(), None);
+        assert!(neighbor.get().is_none());
     }
 
     #[test]
