@@ -1,7 +1,7 @@
 use fixedbitset::FixedBitSet;
 use std::fmt::Display;
 
-pub trait TGraph: Clone {
+pub trait TGraph: Clone + Display {
     fn new_complete(n: usize) -> Self;
     fn has_edge(&self, i: usize, j: usize) -> bool;
     fn remove_edge(&mut self, i: usize, j: usize);
