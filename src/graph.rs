@@ -89,18 +89,47 @@ impl Display for Graph {
             self.edge_count()
         )?;
 
-        for i in 0..self.n {
-            write!(f, "Node {}: ", i)?;
-            let mut first = true;
-            for j in self.neighbors[i].ones() {
-                if !first {
-                    write!(f, ", ")?;
-                }
-                write!(f, "{}", j)?;
-                first = false;
-            }
-            writeln!(f)?;
+        // Top border with column headers
+        write!(f, "  ┌")?;
+        for j in 0..self.n {
+            write!(f, "─")?;
         }
+        writeln!(f, "┐")?;
+
+        write!(f, "  │")?;
+        for j in 0..self.n {
+            write!(f, "{}", j)?;
+        }
+        writeln!(f, "│")?;
+
+        // Separator line
+        write!(f, "┌─┼")?;
+        for j in 0..self.n {
+            write!(f, "─")?;
+        }
+        writeln!(f, "┤")?;
+
+        // Print each row with row labels and borders
+        for i in 0..self.n {
+            write!(f, "│{}│", i)?;
+            for j in 0..self.n {
+                if i == j {
+                    write!(f, " ")?; // Diagonal (self-loops don't exist)
+                } else if self.has_edge(i, j) {
+                    write!(f, "x")?; // Edge exists
+                } else {
+                    write!(f, " ")?; // No edge
+                }
+            }
+            writeln!(f, "│")?;
+        }
+
+        // Bottom border
+        write!(f, "└─┴")?;
+        for j in 0..self.n {
+            write!(f, "─")?;
+        }
+        writeln!(f, "┘")?;
 
         Ok(())
     }
@@ -114,7 +143,6 @@ mod tests {
     fn test_complete_graph_creation() {
         let graph = Graph::new_complete(4);
         assert_eq!(graph.edge_count(), 6); // K4 has 6 edges
-
         // Check all pairs are connected
         for i in 0..4 {
             for j in 0..4 {
@@ -131,7 +159,6 @@ mod tests {
     fn test_edge_removal() {
         let mut graph = Graph::new_complete(3);
         assert_eq!(graph.edge_count(), 3); // K3 has 3 edges
-
         graph.remove_edge(0, 1);
         assert_eq!(graph.edge_count(), 2);
         assert!(!graph.has_edge(0, 1));
@@ -143,7 +170,6 @@ mod tests {
     #[test]
     fn test_valence_calculation() {
         let graph = Graph::new_complete(4);
-
         // In K4, every node has valence 3
         for i in 0..4 {
             assert_eq!(graph.valence(i), 3);
@@ -154,16 +180,13 @@ mod tests {
     fn test_find_candidates() {
         let graph = Graph::new_complete(4);
         let mut candidates = FixedBitSet::with_capacity(4);
-
         // All nodes should be candidates when no requirements
         graph.find_candidates(&[], &mut candidates);
         assert_eq!(candidates.count_ones(..), 4);
-
         // In complete graph, all other nodes connect to any given node
         graph.find_candidates(&[0], &mut candidates);
         let result: Vec<usize> = candidates.ones().collect();
         assert_eq!(result, vec![1, 2, 3]);
-
         // In complete graph, all nodes connect to any pair
         graph.find_candidates(&[0, 1], &mut candidates);
         let result: Vec<usize> = candidates.ones().collect();
@@ -174,7 +197,6 @@ mod tests {
     fn test_is_empty() {
         let mut graph = Graph::new_complete(2);
         assert!(!graph.is_empty());
-
         graph.remove_edge(0, 1);
         assert!(graph.is_empty());
     }
