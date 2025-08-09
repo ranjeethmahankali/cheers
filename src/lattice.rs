@@ -33,7 +33,7 @@ pub struct Lattice {
     conn: Box<[[Neighbor; 6]]>,
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Direction(u8);
 
 impl Direction {
@@ -90,6 +90,10 @@ impl Lattice {
         Self {
             conn: vec![Default::default(); num_nodes].into_boxed_slice(),
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.conn.len()
     }
 
     fn step_loop_ccw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
@@ -307,6 +311,74 @@ impl std::fmt::Display for Lattice {
 mod test {
     use super::*;
 
+    /// Check lattice for consistency - verifies all lattice invariants
+    fn check_lattice_consistency(lattice: &Lattice) {
+        for node in 0u32..(lattice.len() as u32) {
+            // Skip empty nodes
+            if !lattice.contains(node) {
+                continue;
+            }
+            // Check bidirectional connections
+            for dir in Direction::ALL_CCW {
+                if let Some(neighbor_id) = lattice.neighbor(node, dir) {
+                    // Verify neighbor points back to this node
+                    let back_neighbor = lattice.neighbor(neighbor_id, dir.opposite());
+                    assert_eq!(
+                        back_neighbor,
+                        Some(node),
+                        "Node {} has neighbor {} in direction {:?}, but neighbor {} doesn't point back (has {:?} instead of Some({}))",
+                        node,
+                        neighbor_id,
+                        dir,
+                        neighbor_id,
+                        back_neighbor,
+                        node
+                    );
+                    // Verify neighbor exists in lattice
+                    assert!(
+                        lattice.contains(neighbor_id),
+                        "Node {} has neighbor {} in direction {:?}, but neighbor {} doesn't exist in lattice",
+                        node,
+                        neighbor_id,
+                        dir,
+                        neighbor_id
+                    );
+                }
+            }
+            // Check triangular loops using step_loop functions
+            for (_, dir) in lattice.neighbors_with_dirs(node) {
+                if let Some((last, _)) = (0..3).fold(Some((node, dir)), |current, _| {
+                    if let Some((id, dir)) = current
+                        && let Some((next, ndir, nrot)) = lattice.step_loop_cw(id, dir)
+                        && nrot == 1
+                    {
+                        Some((next, ndir))
+                    } else {
+                        None
+                    }
+                }) {
+                    assert_eq!(last, node);
+                }
+                if let Some((last, _)) = (0..3).fold(Some((node, dir)), |current, _| {
+                    if let Some((id, dir)) = current
+                        && let Some((next, ndir, nrot)) = lattice.step_loop_ccw(id, dir)
+                        && nrot == 1
+                    {
+                        Some((next, ndir))
+                    } else {
+                        None
+                    }
+                }) {
+                    assert_eq!(last, node);
+                }
+            }
+            // Check that no node references itself as a neighbor
+            for neighbor in lattice.neighbors(node) {
+                assert_ne!(neighbor, node, "Node {} has itself as a neighbor", node);
+            }
+        }
+    }
+
     #[test]
     fn test_neighbor_put_get() {
         let test_values = [0, 1, 42, 1000, u32::MAX / 2, u32::MAX - 1];
@@ -338,6 +410,7 @@ mod test {
     #[test]
     fn test_print_empty_lattice() {
         let lattice = Lattice::new(5);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         assert_eq!(output, "");
     }
@@ -347,6 +420,7 @@ mod test {
         let mut lattice = Lattice::new(1);
         // Insert node 0 to itself to create a self-loop
         lattice.insert(0, Direction::RIGHT, 0); // Has no effect.
+        check_lattice_consistency(&lattice);
         assert!(format!("{}", lattice).is_empty());
     }
 
@@ -354,6 +428,7 @@ mod test {
     fn test_print_two_node_connection() {
         let mut lattice = Lattice::new(2);
         lattice.insert(0, Direction::RIGHT, 1);
+        check_lattice_consistency(&lattice);
         assert_eq!(format!("{}", lattice).trim(), "0 - 1");
     }
 
@@ -364,6 +439,7 @@ mod test {
         lattice.insert(0, Direction::RIGHT, 1);
         // Then insert the third node to form a triangle
         lattice.insert(0, Direction::TOP_RIGHT, 2);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         assert!(output.contains(" 0 "));
         assert!(output.contains(" 1 "));
@@ -379,6 +455,7 @@ mod test {
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(1, Direction::RIGHT, 2);
         lattice.insert(2, Direction::RIGHT, 3);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         for i in 0..4 {
             assert!(output.contains(&format!(" {} ", i)));
@@ -398,6 +475,7 @@ mod test {
         // Create second linear component
         lattice.insert(3, Direction::RIGHT, 4);
         lattice.insert(4, Direction::RIGHT, 5);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         // All nodes should be present
         for i in 0..6 {
@@ -416,6 +494,7 @@ mod test {
         lattice.insert(0, Direction::TOP_RIGHT, 2);
         // Create a separate small component
         lattice.insert(3, Direction::RIGHT, 4);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         // All nodes should be present
         assert!(output.contains(" 0 "));
@@ -438,6 +517,7 @@ mod test {
         lattice.insert(0, Direction::LEFT, 4);
         lattice.insert(0, Direction::BOTTOM_LEFT, 5);
         lattice.insert(0, Direction::BOTTOM_RIGHT, 6);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         // All nodes in star pattern should be present
         for i in 0..7 {
@@ -457,6 +537,7 @@ mod test {
         lattice.insert(2, Direction::TOP_RIGHT, 5);
         // Separate component with high node IDs
         lattice.insert(7, Direction::RIGHT, 9);
+        check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
         // Should contain only the nodes that were actually connected
         assert!(output.contains(" 0 "));
