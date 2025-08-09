@@ -24,6 +24,10 @@ impl Neighbor {
         self.0.map(|v| v.get() ^ u32::MAX)
     }
 
+    fn clear(&mut self) {
+        self.0 = None;
+    }
+
     fn exists(&self) -> bool {
         self.0.is_some()
     }
@@ -43,6 +47,15 @@ impl Direction {
     pub const LEFT: Self = Self(3);
     pub const BOTTOM_LEFT: Self = Self(4);
     pub const BOTTOM_RIGHT: Self = Self(5);
+
+    const ALL_CCW: [Direction; 6] = [
+        Direction::RIGHT,
+        Direction::TOP_RIGHT,
+        Direction::TOP_LEFT,
+        Direction::LEFT,
+        Direction::BOTTOM_LEFT,
+        Direction::BOTTOM_RIGHT,
+    ];
 
     const fn opposite(self) -> Self {
         Self((self.0 + 3) % 6)
@@ -113,11 +126,6 @@ impl Lattice {
         None
     }
 
-    fn link(&mut self, from: u32, dir: Direction, to: u32) {
-        self.conn[from as usize][dir].put(to);
-        self.conn[to as usize][dir.opposite()].put(from);
-    }
-
     fn neighbor(&self, from: u32, dir: Direction) -> Option<u32> {
         self.conn[from as usize][dir].get()
     }
@@ -127,17 +135,9 @@ impl Lattice {
     }
 
     fn neighbors_with_dirs(&self, id: u32) -> impl Iterator<Item = (u32, Direction)> {
-        const DIRECTIONS: [Direction; 6] = [
-            Direction::RIGHT,
-            Direction::TOP_RIGHT,
-            Direction::TOP_LEFT,
-            Direction::LEFT,
-            Direction::BOTTOM_LEFT,
-            Direction::BOTTOM_RIGHT,
-        ];
         self.conn[id as usize]
             .iter()
-            .zip(DIRECTIONS.iter())
+            .zip(Direction::ALL_CCW.iter())
             .filter_map(|(n, &d)| n.get().map(|n| (n, d)))
     }
 
@@ -145,15 +145,40 @@ impl Lattice {
         self.neighbors(id).next().is_some()
     }
 
+    pub fn remove(&mut self, id: u32) {
+        let mut nbs = [u32::MAX; 6];
+        let mut dirs = [Direction::RIGHT; 6];
+        let mut count = 0usize;
+        // Collect them first, to avoid borrowing and modifying
+        for (nb, dir) in self.conn[id as usize].iter().zip(Direction::ALL_CCW) {
+            if let Some(nb) = nb.get() {
+                nbs[count] = nb;
+                dirs[count] = dir;
+                count += 1;
+            }
+        }
+        for (&nb, &dir) in nbs.iter().zip(dirs.iter()).take(count) {
+            self.conn[id as usize][dir].clear();
+            self.conn[nb as usize][dir.opposite()].clear();
+        }
+    }
+
     pub fn insert(&mut self, id: u32, dir: Direction, newid: u32) {
-        self.link(id, dir, newid);
+        // Remove if something was there.
+        if let Some(nb) = self.neighbor(id, dir) {
+            self.remove(nb);
+        }
+        // Now insert.
+        self.conn[id as usize][dir].put(newid);
+        self.conn[newid as usize][dir.opposite()].put(id);
         {
             // Orbit the loop clockwise and link nodes.
             let mut id = id;
             let mut dir = dir.rotate_ccw();
             while let Some(next) = self.neighbor(id, dir) {
                 dir = dir.opposite().rotate_ccw();
-                self.link(next, dir, newid);
+                self.conn[next as usize][dir].put(newid);
+                self.conn[newid as usize][dir.opposite()].put(next);
                 dir = dir.rotate_ccw();
                 id = next;
             }
@@ -166,7 +191,8 @@ impl Lattice {
             let mut dir = dir.rotate_cw();
             while let Some(next) = self.neighbor(id, dir) {
                 dir = dir.opposite().rotate_cw();
-                self.link(next, dir, newid);
+                self.conn[next as usize][dir].put(newid);
+                self.conn[newid as usize][dir.opposite()].put(next);
                 dir = dir.rotate_cw();
                 id = next;
             }
@@ -190,7 +216,6 @@ impl std::fmt::Display for Lattice {
             {
                 continue;
             }
-            writeln!(f)?;
             component_nodes.clear();
             stack.clear();
             stack.push((start_node as u32, 0isize, 0isize));
