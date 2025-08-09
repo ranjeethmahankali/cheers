@@ -7,7 +7,7 @@ pub trait TGraph: Clone {
     fn remove_edge(&mut self, i: usize, j: usize);
     fn edge_count(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn degree(&self, node: usize) -> usize;
+    fn valence(&self, node: usize) -> usize;
     fn find_candidates(&self, required: &[usize], candidates: &mut FixedBitSet);
     fn node_count(&self) -> usize;
 }
@@ -34,17 +34,12 @@ impl TGraph for Graph {
     }
 
     fn has_edge(&self, i: usize, j: usize) -> bool {
-        if i >= self.n || j >= self.n || i == j {
-            return false;
-        }
         self.neighbors[i].contains(j)
     }
 
     fn remove_edge(&mut self, i: usize, j: usize) {
-        if i < self.n && j < self.n && i != j {
-            self.neighbors[i].remove(j);
-            self.neighbors[j].remove(i);
-        }
+        self.neighbors[i].remove(j);
+        self.neighbors[j].remove(i);
     }
 
     fn edge_count(&self) -> usize {
@@ -59,10 +54,7 @@ impl TGraph for Graph {
         self.neighbors.iter().all(|n| n.is_clear())
     }
 
-    fn degree(&self, node: usize) -> usize {
-        if node >= self.n {
-            return 0;
-        }
+    fn valence(&self, node: usize) -> usize {
         self.neighbors[node].count_ones(..)
     }
 
@@ -149,12 +141,12 @@ mod tests {
     }
 
     #[test]
-    fn test_degree_calculation() {
+    fn test_valence_calculation() {
         let graph = Graph::new_complete(4);
 
-        // In K4, every node has degree 3
+        // In K4, every node has valence 3
         for i in 0..4 {
-            assert_eq!(graph.degree(i), 3);
+            assert_eq!(graph.valence(i), 3);
         }
     }
 
