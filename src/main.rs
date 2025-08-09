@@ -3,6 +3,9 @@ use std::{
     fmt::Display,
 };
 
+mod graph;
+use graph::{Graph, TGraph};
+
 #[derive(Debug)]
 enum Error {
     AlreadyOccupied(isize, isize),
@@ -159,16 +162,25 @@ impl Display for Lattice {
 }
 
 fn main() -> Result<(), Error> {
-    let mut grid = Lattice::default();
-    grid.put((0, 0), 0)?;
-    grid.put((0, 1), 1)?;
-    grid.put((1, 0), 2)?;
-    grid.put((1, 1), 3)?;
-    grid.put((0, 2), 4)?;
-    grid.put((-1, 2), 5)?;
-    grid.put((2, 1), 6)?;
-    grid.put((2, 2), 7)?;
-    grid.put((1, 2), 8)?;
-    println!("\n{}\n", grid);
+    let mut lattice = Lattice::default();
+    lattice.put((0, 0), 0)?;
+    lattice.put((0, 1), 1)?;
+    lattice.put((1, 0), 2)?;
+    lattice.put((1, 1), 3)?;
+    lattice.put((0, 2), 4)?;
+    lattice.put((-1, 2), 5)?;
+    lattice.put((2, 1), 6)?;
+    lattice.put((2, 2), 7)?;
+    lattice.put((1, 2), 8)?;
+    println!("\n{}\n", lattice);
+
+    // Test the graph
+    let mut graph = Graph::new_complete(4);
+    println!("{}", graph);
+
+    graph.remove_edge(0, 1);
+    println!("After removing edge 0-1:");
+    println!("{}", graph);
+
     Ok(())
 }
