@@ -1,10 +1,11 @@
+mod graph;
+mod lattice;
+
+use graph::{Graph, TGraph};
 use std::{
     collections::{HashMap, hash_map::Entry},
     fmt::Display,
 };
-
-mod graph;
-use graph::{Graph, TGraph};
 
 #[derive(Debug)]
 enum Error {
@@ -46,11 +47,11 @@ rectangular grid, and infer the connectivity from the indices.
  */
 
 #[derive(Default)]
-struct Lattice {
+struct HashMapLattice {
     table: HashMap<(isize, isize), usize>,
 }
 
-impl Lattice {
+impl HashMapLattice {
     fn put(&mut self, (x, y): (isize, isize), item: usize) -> Result<(), Error> {
         match self.table.entry((x, y)) {
             Entry::Occupied(_) => Err(Error::AlreadyOccupied(x, y)),
@@ -77,7 +78,7 @@ impl Lattice {
     }
 }
 
-impl Display for Lattice {
+impl Display for HashMapLattice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (xmin, _ymin, _xmax, _ymax) = self.table.keys().fold(
             (isize::MAX, isize::MAX, isize::MIN, isize::MIN),
@@ -162,7 +163,7 @@ impl Display for Lattice {
 }
 
 fn main() -> Result<(), Error> {
-    let mut lattice = Lattice::default();
+    let mut lattice = HashMapLattice::default();
     lattice.put((0, 0), 0)?;
     lattice.put((0, 1), 1)?;
     lattice.put((1, 0), 2)?;
