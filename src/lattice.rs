@@ -120,6 +120,14 @@ impl Lattice {
         self.conn[from as usize][dir].get()
     }
 
+    fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
+        self.conn[id as usize].iter().filter_map(|n| n.get())
+    }
+
+    fn contains(&self, id: u32) -> bool {
+        self.neighbors(id).next().is_some()
+    }
+
     fn insert(&mut self, id: u32, Slot(newid, dir): Slot) {
         self.link(id, dir, newid);
         {
