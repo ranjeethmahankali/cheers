@@ -11,7 +11,9 @@ enum Error {
 impl Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Error::AlreadyOccupied(x, y) => write!(f, "Position ({}, {}) is already occupied", x, y),
+            Error::AlreadyOccupied(x, y) => {
+                write!(f, "Position ({}, {}) is already occupied", x, y)
+            }
         }
     }
 }
@@ -41,11 +43,11 @@ rectangular grid, and infer the connectivity from the indices.
  */
 
 #[derive(Default)]
-struct Grid {
+struct Lattice {
     table: HashMap<(isize, isize), usize>,
 }
 
-impl Grid {
+impl Lattice {
     fn put(&mut self, (x, y): (isize, isize), item: usize) -> Result<(), Error> {
         match self.table.entry((x, y)) {
             Entry::Occupied(_) => Err(Error::AlreadyOccupied(x, y)),
@@ -72,7 +74,7 @@ impl Grid {
     }
 }
 
-impl Display for Grid {
+impl Display for Lattice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let (xmin, _ymin, _xmax, _ymax) = self.table.keys().fold(
             (isize::MAX, isize::MAX, isize::MIN, isize::MIN),
@@ -157,7 +159,7 @@ impl Display for Grid {
 }
 
 fn main() -> Result<(), Error> {
-    let mut grid = Grid::default();
+    let mut grid = Lattice::default();
     grid.put((0, 0), 0)?;
     grid.put((0, 1), 1)?;
     grid.put((1, 0), 2)?;
