@@ -26,14 +26,15 @@ fn main() -> Result<(), Error> {
     let mut lattice = Lattice::new(507);
     lattice.insert(0, Direction::RIGHT, 1);
     let mut visited = Vec::new();
-    let mut nb_buf = Vec::new();
-    let mut nbs_out = Vec::new();
+    let mut slots = Vec::new();
     println!("{}\n===========================\n", lattice);
     for id in 2u32..(lattice.len() as u32) {
-        let (best, dir) = lattice
-            .best_empty_slot(&mut visited, &mut nb_buf, &mut nbs_out)
-            .expect("Cannot find the best empty slot");
-        lattice.insert(best, dir, id);
+        lattice.empty_slots(&mut visited, &mut slots);
+        for slot in slots.iter() {
+            println!("{:?}", slot);
+        }
+        let (from, dir, _) = slots.last().unwrap();
+        lattice.insert(*from, *dir, id);
         println!("{}\n===========================\n", lattice);
     }
 

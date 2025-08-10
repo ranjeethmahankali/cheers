@@ -8,11 +8,20 @@ use std::{
 // for the two states when the vertex does and does not exist in the slot.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-struct Neighbor(Option<NonZeroU32>);
+pub struct Neighbor(Option<NonZeroU32>);
 
 impl Default for Neighbor {
     fn default() -> Self {
         Self(None)
+    }
+}
+
+impl Debug for Neighbor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get() {
+            Some(id) => write!(f, "{id}"),
+            None => write!(f, "NONE"),
+        }
     }
 }
 
@@ -21,7 +30,7 @@ impl Neighbor {
         self.0 = NonZeroU32::new(id ^ u32::MAX);
     }
 
-    fn get(&self) -> Option<u32> {
+    pub fn get(&self) -> Option<u32> {
         self.0.map(|v| v.get() ^ u32::MAX)
     }
 
@@ -30,6 +39,7 @@ impl Neighbor {
     }
 }
 
+#[derive(Clone)]
 pub struct Lattice {
     conn: Box<[[Neighbor; 6]]>,
 }
@@ -121,6 +131,12 @@ impl Lattice {
         self.conn.len()
     }
 
+    pub fn clear(&mut self) {
+        for nbs in &mut self.conn {
+            nbs.fill(Neighbor::default());
+        }
+    }
+
     fn step_loop_ccw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
         let nb = self.neighbor(node_id, direction)?;
         let stop = direction.opposite();
@@ -155,7 +171,7 @@ impl Lattice {
         self.conn[from as usize][dir].get()
     }
 
-    fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
+    pub fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
         self.conn[id as usize].iter().filter_map(|n| n.get())
     }
 
@@ -166,7 +182,7 @@ impl Lattice {
             .filter_map(|(n, &d)| n.get().map(|n| (n, d)))
     }
 
-    fn contains(&self, id: u32) -> bool {
+    pub fn contains(&self, id: u32) -> bool {
         self.neighbors(id).next().is_some()
     }
 
@@ -231,16 +247,14 @@ impl Lattice {
     ///
     /// `visited` and `nb_buf` are temporary buffers used in this function,
     /// passed in by the caller to avoid allocations.
-    pub fn best_empty_slot(
+    pub fn empty_slots(
         &self,
         visited: &mut Vec<bool>,
-        nb_buf: &mut Vec<u32>,
-        nbs_out: &mut Vec<u32>,
-    ) -> Option<(u32, Direction)> {
+        out: &mut Vec<(u32, Direction, [Neighbor; 6])>,
+    ) {
         visited.clear();
         visited.resize(self.len(), false);
-        let mut best = None;
-        nbs_out.clear();
+        out.clear();
         for id in 0u32..(self.len() as u32) {
             if visited[id as usize] {
                 continue;
@@ -255,7 +269,6 @@ impl Lattice {
             };
             let mut curid = id;
             let mut dir = dir;
-            let mut curndir = dir.rotate_cw();
             // If we happen to be in the middle of a concavity, we don't want to
             // start counting from here.  So we try to walk backwards to the
             // start of this concavity before we start counting.
@@ -280,10 +293,11 @@ impl Lattice {
                 .neighbor(curid, dir)
                 .expect("Topology is broken if we don't get this");
             dir = dir.opposite();
-            nb_buf.clear();
+            let mut curndir = dir.rotate_cw();
+            let mut curnb = [Neighbor::default(); 6];
             loop {
                 visited[curid as usize] = true;
-                nb_buf.push(curid);
+                curnb[dir.opposite()].put(curid);
                 let (next, ndir, nrot) = self
                     .step_loop_ccw(curid, dir)
                     .expect("This is a boundary edge, so the loop step should never fail");
@@ -294,12 +308,8 @@ impl Lattice {
                     1 => panic!("This implies broken topology. This should never happen"),
                     2 => {} // Keep going.
                     _ => {
-                        if nb_buf.len() > nbs_out.len() {
-                            nbs_out.clear();
-                            nbs_out.extend_from_slice(&nb_buf);
-                            best = Some((curid, curndir));
-                        }
-                        nb_buf.clear();
+                        out.push((curid, curndir, curnb));
+                        curnb.fill(Neighbor::default());
                     }
                 }
                 curid = next;
@@ -307,7 +317,6 @@ impl Lattice {
                 curndir = dir.rotate_cw();
             }
         }
-        best
     }
 }
 

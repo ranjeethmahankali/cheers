@@ -3,11 +3,11 @@ use std::fmt::Display;
 
 pub trait TGraph: Clone + Display {
     fn new_complete(n: usize) -> Self;
-    fn has_edge(&self, i: usize, j: usize) -> bool;
-    fn remove_edge(&mut self, i: usize, j: usize);
+    fn has_edge(&self, i: u32, j: u32) -> bool;
+    fn remove_edge(&mut self, i: u32, j: u32);
     fn num_edges(&self) -> usize;
     fn is_empty(&self) -> bool;
-    fn valence(&self, node: usize) -> usize;
+    fn valence(&self, node: u32) -> usize;
     fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet);
     fn num_nodes(&self) -> usize;
 }
@@ -36,13 +36,13 @@ impl TGraph for Graph {
         }
     }
 
-    fn has_edge(&self, i: usize, j: usize) -> bool {
-        self.conn[i].contains(j)
+    fn has_edge(&self, i: u32, j: u32) -> bool {
+        self.conn[i as usize].contains(j as usize)
     }
 
-    fn remove_edge(&mut self, i: usize, j: usize) {
-        self.conn[i].remove(j);
-        self.conn[j].remove(i);
+    fn remove_edge(&mut self, i: u32, j: u32) {
+        self.conn[i as usize].remove(j as usize);
+        self.conn[j as usize].remove(i as usize);
     }
 
     fn num_edges(&self) -> usize {
@@ -53,8 +53,8 @@ impl TGraph for Graph {
         self.conn.iter().all(|n| n.is_clear())
     }
 
-    fn valence(&self, node: usize) -> usize {
-        self.conn[node].count_ones(..)
+    fn valence(&self, node: u32) -> usize {
+        self.conn[node as usize].count_ones(..)
     }
 
     fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet) {
@@ -97,7 +97,7 @@ impl Display for Graph {
         }
         writeln!(f, "┐")?;
         // Print each row with row labels and borders (only bottom-right triangle)
-        for i in 0..self.n_nodes {
+        for i in 0..(self.n_nodes as u32) {
             write!(f, "│{:width$}│", i, width = max_digits)?;
             for j in 0..=i {
                 if i == j {
@@ -109,7 +109,7 @@ impl Display for Graph {
                 }
             }
             // Fill remaining space to align with full width
-            for _j in (i + 1)..self.n_nodes {
+            for _j in (i + 1)..(self.n_nodes as u32) {
                 write!(f, " ")?;
             }
             writeln!(f, "│")?;
