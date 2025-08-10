@@ -297,20 +297,21 @@ impl Lattice {
             let mut curnb = [Neighbor::default(); 6];
             loop {
                 visited[curid as usize] = true;
-                curnb[dir.opposite()].put(curid);
+                curnb[curndir.opposite()].put(curid);
                 let (next, ndir, nrot) = self
                     .step_loop_ccw(curid, dir)
                     .expect("This is a boundary edge, so the loop step should never fail");
-                if next == id {
-                    break;
-                }
                 match nrot {
                     1 => panic!("This implies broken topology. This should never happen"),
                     2 => {} // Keep going.
                     _ => {
+                        curnb[curndir.opposite().rotate_cw()].put(next);
                         out.push((curid, curndir, curnb));
                         curnb.fill(Neighbor::default());
                     }
+                }
+                if next == id {
+                    break;
                 }
                 curid = next;
                 dir = ndir;

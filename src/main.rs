@@ -30,9 +30,6 @@ fn main() -> Result<(), Error> {
     println!("{}\n===========================\n", lattice);
     for id in 2u32..(lattice.len() as u32) {
         lattice.empty_slots(&mut visited, &mut slots);
-        for slot in slots.iter() {
-            println!("{:?}", slot);
-        }
         let (from, dir, _) = slots.last().unwrap();
         lattice.insert(*from, *dir, id);
         println!("{}\n===========================\n", lattice);
