@@ -2,28 +2,10 @@ mod graph;
 mod greedy;
 mod lattice;
 
-use graph::{Graph, TGraph};
+use graph::Graph;
 use greedy::solve_greedy;
-use std::fmt::Display;
 
-#[derive(Debug)]
-enum Error {
-    AlreadyOccupied(isize, isize),
-}
-
-impl Display for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Error::AlreadyOccupied(x, y) => {
-                write!(f, "Position ({}, {}) is already occupied", x, y)
-            }
-        }
-    }
-}
-
-fn main() -> Result<(), Error> {
-    use lattice::{Direction, *};
-
+fn main() {
     let solns = solve_greedy::<Graph>(5);
     println!("Found {}", solns.len());
     for soln in solns {
@@ -63,6 +45,4 @@ fn main() -> Result<(), Error> {
     // graph.remove_edge(9, 11);
     // println!("After removing some edges:");
     // println!("{}", graph);
-
-    Ok(())
 }
