@@ -1,4 +1,5 @@
 mod graph;
+mod greedy;
 mod lattice;
 
 use graph::{Graph, TGraph};
