@@ -6,7 +6,7 @@ use graph::Graph;
 use greedy::solve_greedy;
 
 fn main() {
-    let solns = solve_greedy::<Graph>(5);
+    let solns = solve_greedy::<Graph>(6);
     println!("Found {}", solns.len());
     for soln in solns {
         println!("=============\n{}", soln);

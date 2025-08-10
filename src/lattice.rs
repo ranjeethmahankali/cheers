@@ -305,6 +305,9 @@ impl Lattice {
                     0 | 1 => panic!("This implies broken topology. This should never happen"),
                     2 => {} // Keep going.
                     _ => {
+                        curnb[curndir.opposite().rotate_cw()].put(next);
+                        out.push((curid, curndir, curnb));
+                        curnb.fill(Neighbor::default());
                         {
                             let mut odir = dir.opposite();
                             for _ in 0..(nrot - 2) {
@@ -314,9 +317,6 @@ impl Lattice {
                                 out.push((next, odir, nbs));
                             }
                         }
-                        curnb[curndir.opposite().rotate_cw()].put(next);
-                        out.push((curid, curndir, curnb));
-                        curnb.fill(Neighbor::default());
                     }
                 }
                 if next == id {
