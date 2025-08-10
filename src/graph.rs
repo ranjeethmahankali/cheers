@@ -5,17 +5,17 @@ pub trait TGraph: Clone + Display {
     fn new_complete(n: usize) -> Self;
     fn has_edge(&self, i: usize, j: usize) -> bool;
     fn remove_edge(&mut self, i: usize, j: usize);
-    fn edge_count(&self) -> usize;
+    fn num_edges(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn valence(&self, node: usize) -> usize;
     fn find_candidates(&self, required: &[usize], candidates: &mut FixedBitSet);
-    fn node_count(&self) -> usize;
+    fn num_nodes(&self) -> usize;
 }
 
 #[derive(Clone)]
 pub struct Graph {
-    n: usize,
-    neighbors: Vec<FixedBitSet>,
+    n_nodes: usize,
+    conn: Vec<FixedBitSet>,
 }
 
 impl TGraph for Graph {
@@ -30,53 +30,49 @@ impl TGraph for Graph {
             neighbors.push(node_neighbors);
         }
 
-        Self { n, neighbors }
+        Self {
+            n_nodes: n,
+            conn: neighbors,
+        }
     }
 
     fn has_edge(&self, i: usize, j: usize) -> bool {
-        self.neighbors[i].contains(j)
+        self.conn[i].contains(j)
     }
 
     fn remove_edge(&mut self, i: usize, j: usize) {
-        self.neighbors[i].remove(j);
-        self.neighbors[j].remove(i);
+        self.conn[i].remove(j);
+        self.conn[j].remove(i);
     }
 
-    fn edge_count(&self) -> usize {
-        self.neighbors
-            .iter()
-            .map(|n| n.count_ones(..))
-            .sum::<usize>()
-            / 2
+    fn num_edges(&self) -> usize {
+        self.conn.iter().map(|n| n.count_ones(..)).sum::<usize>() / 2
     }
 
     fn is_empty(&self) -> bool {
-        self.neighbors.iter().all(|n| n.is_clear())
+        self.conn.iter().all(|n| n.is_clear())
     }
 
     fn valence(&self, node: usize) -> usize {
-        self.neighbors[node].count_ones(..)
+        self.conn[node].count_ones(..)
     }
 
     fn find_candidates(&self, required: &[usize], candidates: &mut FixedBitSet) {
         candidates.clear();
-
         if required.is_empty() {
-            candidates.insert_range(..self.n);
+            candidates.insert_range(..self.n_nodes);
             return;
         }
-
         // Start with neighbors of first required node
-        candidates.clone_from(&self.neighbors[required[0]]);
-
+        candidates.clone_from(&self.conn[required[0]]);
         // Intersect with neighbors of each subsequent required node
         for &node in &required[1..] {
-            candidates.intersect_with(&self.neighbors[node]);
+            candidates.intersect_with(&self.conn[node]);
         }
     }
 
-    fn node_count(&self) -> usize {
-        self.n
+    fn num_nodes(&self) -> usize {
+        self.n_nodes
     }
 }
 
@@ -85,23 +81,23 @@ impl Display for Graph {
         writeln!(
             f,
             "Graph K_{} ({} edges remaining):",
-            self.n,
-            self.edge_count()
+            self.n_nodes,
+            self.num_edges()
         )?;
         // Calculate how many digits we need for the largest number
-        let max_digits = if self.n == 0 {
+        let max_digits = if self.n_nodes == 0 {
             1
         } else {
-            (self.n - 1).to_string().len()
+            (self.n_nodes - 1).to_string().len()
         };
         // Top border - close the row label area and connect to main area
         write!(f, "┌{:─<width$}┬", "", width = max_digits)?;
-        for _j in 0..self.n {
+        for _j in 0..self.n_nodes {
             write!(f, "─")?;
         }
         writeln!(f, "┐")?;
         // Print each row with row labels and borders (only bottom-right triangle)
-        for i in 0..self.n {
+        for i in 0..self.n_nodes {
             write!(f, "│{:width$}│", i, width = max_digits)?;
             for j in 0..=i {
                 if i == j {
@@ -113,21 +109,21 @@ impl Display for Graph {
                 }
             }
             // Fill remaining space to align with full width
-            for _j in (i + 1)..self.n {
+            for _j in (i + 1)..self.n_nodes {
                 write!(f, " ")?;
             }
             writeln!(f, "│")?;
         }
         // Bottom border of row label area and separator to column labels
         write!(f, "└{:─<width$}┼", "", width = max_digits)?;
-        for _j in 0..self.n {
+        for _j in 0..self.n_nodes {
             write!(f, "─")?;
         }
         writeln!(f, "┤")?;
         // Column headers - print digits vertically, bottom-aligned (least significant digit closest to table)
         for digit_pos in 0..max_digits {
             write!(f, "{:width$}│", "", width = max_digits + 1)?;
-            for j in 0..self.n {
+            for j in 0..self.n_nodes {
                 let j_str = format!("{:0width$}", j, width = max_digits);
                 write!(f, "{}", j_str.chars().nth(digit_pos).unwrap())?;
             }
@@ -135,7 +131,7 @@ impl Display for Graph {
         }
         // Bottom border
         write!(f, "{:width$}└", "", width = max_digits + 1)?;
-        for _j in 0..self.n {
+        for _j in 0..self.n_nodes {
             write!(f, "─")?;
         }
         writeln!(f, "┘")?;
@@ -150,7 +146,7 @@ mod tests {
     #[test]
     fn test_complete_graph_creation() {
         let graph = Graph::new_complete(4);
-        assert_eq!(graph.edge_count(), 6); // K4 has 6 edges
+        assert_eq!(graph.num_edges(), 6); // K4 has 6 edges
         // Check all pairs are connected
         for i in 0..4 {
             for j in 0..4 {
@@ -166,9 +162,9 @@ mod tests {
     #[test]
     fn test_edge_removal() {
         let mut graph = Graph::new_complete(3);
-        assert_eq!(graph.edge_count(), 3); // K3 has 3 edges
+        assert_eq!(graph.num_edges(), 3); // K3 has 3 edges
         graph.remove_edge(0, 1);
-        assert_eq!(graph.edge_count(), 2);
+        assert_eq!(graph.num_edges(), 2);
         assert!(!graph.has_edge(0, 1));
         assert!(!graph.has_edge(1, 0));
         assert!(graph.has_edge(0, 2));
