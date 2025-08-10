@@ -10,6 +10,7 @@ pub trait TGraph: Clone + Display {
     fn valence(&self, node: u32) -> usize;
     fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet);
     fn num_nodes(&self) -> usize;
+    fn edges(&self, id: u32) -> impl Iterator<Item = u32>;
 }
 
 #[derive(Clone)]
@@ -43,6 +44,10 @@ impl TGraph for Graph {
     fn remove_edge(&mut self, i: u32, j: u32) {
         self.conn[i as usize].remove(j as usize);
         self.conn[j as usize].remove(i as usize);
+    }
+
+    fn edges(&self, id: u32) -> impl Iterator<Item = u32> {
+        self.conn[id as usize].ones().map(|n| n as u32)
     }
 
     fn num_edges(&self) -> usize {

@@ -44,7 +44,38 @@ where
             found = true;
             break;
         }
-        if !found || graph.is_empty() {
+        if !found {
+            out.push(lattice.clone());
+            lattice.clear();
+            match (0..(graph.num_nodes() as u32)).fold(
+                None,
+                |best: Option<(u32, usize)>, current| {
+                    let cval = graph.valence(current);
+                    match best {
+                        Some((best, val)) if val >= cval => Some((best, val)),
+                        _ => Some((current, cval)),
+                    }
+                },
+            ) {
+                Some((best, _)) => {
+                    match graph.edges(best).fold(None, |nbest, current| {
+                        let cval = graph.valence(current);
+                        match nbest {
+                            Some((nbest, nval)) if nval >= cval => Some((nbest, nval)),
+                            _ => Some((current, cval)),
+                        }
+                    }) {
+                        Some((nbest, _)) => {
+                            lattice.insert(best, Direction::RIGHT, nbest);
+                            graph.remove_edge(best, nbest);
+                        }
+                        None => break,
+                    }
+                }
+                None => break,
+            }
+        }
+        if graph.is_empty() {
             out.push(lattice.clone());
         }
     }
