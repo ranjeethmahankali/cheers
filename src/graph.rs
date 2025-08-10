@@ -8,7 +8,7 @@ pub trait TGraph: Clone + Display {
     fn num_edges(&self) -> usize;
     fn is_empty(&self) -> bool;
     fn valence(&self, node: usize) -> usize;
-    fn find_candidates(&self, required: &[usize], candidates: &mut FixedBitSet);
+    fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet);
     fn num_nodes(&self) -> usize;
 }
 
@@ -57,17 +57,17 @@ impl TGraph for Graph {
         self.conn[node].count_ones(..)
     }
 
-    fn find_candidates(&self, required: &[usize], candidates: &mut FixedBitSet) {
+    fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet) {
         candidates.clear();
+        candidates.grow_and_insert(self.n_nodes);
         if required.is_empty() {
-            candidates.insert_range(..self.n_nodes);
             return;
         }
         // Start with neighbors of first required node
-        candidates.clone_from(&self.conn[required[0]]);
+        candidates.clone_from(&self.conn[required[0] as usize]);
         // Intersect with neighbors of each subsequent required node
         for &node in &required[1..] {
-            candidates.intersect_with(&self.conn[node]);
+            candidates.intersect_with(&self.conn[node as usize]);
         }
     }
 

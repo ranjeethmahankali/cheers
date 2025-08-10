@@ -23,7 +23,7 @@ impl Display for Error {
 fn main() -> Result<(), Error> {
     use lattice::{Direction, *};
 
-    let mut lattice = Lattice::new(20);
+    let mut lattice = Lattice::new(507);
     lattice.insert(0, Direction::RIGHT, 1);
     let mut visited = Vec::new();
     let mut nb_buf = Vec::new();
