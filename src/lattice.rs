@@ -302,9 +302,18 @@ impl Lattice {
                     .step_loop_ccw(curid, dir)
                     .expect("This is a boundary edge, so the loop step should never fail");
                 match nrot {
-                    1 => panic!("This implies broken topology. This should never happen"),
+                    0 | 1 => panic!("This implies broken topology. This should never happen"),
                     2 => {} // Keep going.
                     _ => {
+                        {
+                            let mut odir = dir.opposite();
+                            for _ in 0..(nrot - 2) {
+                                odir = odir.rotate_ccw();
+                                let mut nbs = [Neighbor::default(); 6];
+                                nbs[odir.opposite()].put(next);
+                                out.push((next, odir, nbs));
+                            }
+                        }
                         curnb[curndir.opposite().rotate_cw()].put(next);
                         out.push((curid, curndir, curnb));
                         curnb.fill(Neighbor::default());
