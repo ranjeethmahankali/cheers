@@ -22,27 +22,41 @@ impl Display for Error {
 fn main() -> Result<(), Error> {
     use lattice::{Direction, *};
 
-    let mut our_lattice = Lattice::new(9);
-    our_lattice.insert(0, Direction::TOP_RIGHT, 1);
-    our_lattice.insert(0, Direction::RIGHT, 2);
-    our_lattice.insert(1, Direction::RIGHT, 3);
-    our_lattice.insert(1, Direction::TOP_RIGHT, 4);
-    our_lattice.insert(1, Direction::TOP_LEFT, 5);
-    our_lattice.insert(3, Direction::RIGHT, 6);
-    our_lattice.insert(3, Direction::TOP_RIGHT, 8);
-    our_lattice.insert(6, Direction::TOP_RIGHT, 7);
+    let mut lattice = Lattice::new(20);
+    lattice.insert(0, Direction::RIGHT, 1);
+    let mut visited = Vec::new();
+    let mut nb_buf = Vec::new();
+    let mut nbs_out = Vec::new();
+    println!("{}\n===========================\n", lattice);
+    for id in 2u32..(lattice.len() as u32) {
+        let (best, dir) = lattice
+            .best_empty_slot(&mut visited, &mut nb_buf, &mut nbs_out)
+            .expect("Cannot find the best empty slot");
+        lattice.insert(best, dir, id);
+        println!("{}\n===========================\n", lattice);
+    }
 
-    println!("Our Lattice:\n{}\n", our_lattice);
+    // let mut our_lattice = Lattice::new(9);
+    // our_lattice.insert(0, Direction::TOP_RIGHT, 1);
+    // our_lattice.insert(0, Direction::RIGHT, 2);
+    // our_lattice.insert(1, Direction::RIGHT, 3);
+    // our_lattice.insert(1, Direction::TOP_RIGHT, 4);
+    // our_lattice.insert(1, Direction::TOP_LEFT, 5);
+    // our_lattice.insert(3, Direction::RIGHT, 6);
+    // our_lattice.insert(3, Direction::TOP_RIGHT, 8);
+    // our_lattice.insert(6, Direction::TOP_RIGHT, 7);
 
-    // Test the graph
-    let mut graph = Graph::new_complete(12);
-    println!("{}", graph);
+    // println!("Our Lattice:\n{}\n", our_lattice);
 
-    graph.remove_edge(0, 1);
-    graph.remove_edge(5, 7);
-    graph.remove_edge(9, 11);
-    println!("After removing some edges:");
-    println!("{}", graph);
+    // // Test the graph
+    // let mut graph = Graph::new_complete(12);
+    // println!("{}", graph);
+
+    // graph.remove_edge(0, 1);
+    // graph.remove_edge(5, 7);
+    // graph.remove_edge(9, 11);
+    // println!("After removing some edges:");
+    // println!("{}", graph);
 
     Ok(())
 }

@@ -1,4 +1,5 @@
 use std::{
+    fmt::Debug,
     num::NonZeroU32,
     ops::{Index, IndexMut},
 };
@@ -33,8 +34,22 @@ pub struct Lattice {
     conn: Box<[[Neighbor; 6]]>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Direction(u8);
+
+impl Debug for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self.0 {
+            0 => "RIGHT",
+            1 => "TOP_RIGHT",
+            2 => "TOP_LEFT",
+            3 => "LEFT",
+            4 => "BOTTOM_LEFT",
+            5 => "BOTTOM_RIGHT",
+            _ => panic!("Invalid direction"),
+        })
+    }
+}
 
 impl Direction {
     pub const RIGHT: Self = Self(0);
@@ -99,7 +114,7 @@ impl Lattice {
     fn step_loop_ccw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
         let nb = self.neighbor(node_id, direction)?;
         let stop = direction.opposite();
-        let mut dir = direction.opposite().rotate_ccw();
+        let mut dir = stop.rotate_ccw();
         let mut rotations = 1;
         while dir != stop {
             if self.neighbor(nb, dir).is_some() {
@@ -108,13 +123,13 @@ impl Lattice {
             dir = dir.rotate_ccw();
             rotations += 1;
         }
-        None
+        Some((nb, stop, 6))
     }
 
     fn step_loop_cw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
         let nb = self.neighbor(node_id, direction)?;
         let stop = direction.opposite();
-        let mut dir = direction.opposite().rotate_cw();
+        let mut dir = stop.rotate_cw();
         let mut rotations = 1;
         while dir != stop {
             if self.neighbor(nb, dir).is_some() {
@@ -123,7 +138,7 @@ impl Lattice {
             dir = dir.rotate_cw();
             rotations += 1;
         }
-        None
+        Some((nb, stop, 6))
     }
 
     fn neighbor(&self, from: u32, dir: Direction) -> Option<u32> {
@@ -203,8 +218,86 @@ impl Lattice {
     }
 
     /// Return the empty slot with the highest valence and it's neighbors.
-    fn best_empty_slot() -> ((u32, Direction), [Neighbor; 6]) {
-        todo!("Not Implemented")
+    ///
+    /// `visited` and `nb_buf` are temporary buffers used in this function,
+    /// passed in by the caller to avoid allocations.
+    pub fn best_empty_slot(
+        &self,
+        visited: &mut Vec<bool>,
+        nb_buf: &mut Vec<u32>,
+        nbs_out: &mut Vec<u32>,
+    ) -> Option<(u32, Direction)> {
+        visited.clear();
+        visited.resize(self.len(), false);
+        let mut best = None;
+        nbs_out.clear();
+        for id in 0u32..(self.len() as u32) {
+            if visited[id as usize] {
+                continue;
+            }
+            // Find boundary edge.
+            let dir = match self
+                .neighbors_with_dirs(id)
+                .find(|(_, dir)| self.neighbor(id, dir.rotate_cw()).is_none())
+            {
+                Some((_, dir)) => dir,
+                None => continue,
+            };
+            let mut curid = id;
+            let mut dir = dir;
+            let mut curndir = dir.rotate_cw();
+            // If we happen to be in the middle of a concavity, we don't want to
+            // start counting from here.  So we try to walk backwards to the
+            // start of this concavity before we start counting.
+            curid = self
+                .neighbor(curid, dir)
+                .expect("Topology is broken if we don't get this");
+            dir = dir.opposite();
+            loop {
+                let (next, ndir, nrot) = self
+                    .step_loop_cw(curid, dir)
+                    .expect("We're on the boundary loop. This should never happen");
+                match nrot {
+                    1 => panic!("This implies broken topology. This should never happen"),
+                    2 => {
+                        curid = next;
+                        dir = ndir;
+                    }
+                    _ => break,
+                }
+            }
+            curid = self
+                .neighbor(curid, dir)
+                .expect("Topology is broken if we don't get this");
+            dir = dir.opposite();
+            nb_buf.clear();
+            loop {
+                visited[curid as usize] = true;
+                nb_buf.push(curid);
+                let (next, ndir, nrot) = self
+                    .step_loop_ccw(curid, dir)
+                    .expect("This is a boundary edge, so the loop step should never fail");
+                if next == id {
+                    break;
+                }
+                match nrot {
+                    1 => panic!("This implies broken topology. This should never happen"),
+                    2 => {} // Keep going.
+                    _ => {
+                        if nb_buf.len() > nbs_out.len() {
+                            nbs_out.clear();
+                            nbs_out.extend_from_slice(&nb_buf);
+                            best = Some((curid, curndir));
+                        }
+                        nb_buf.clear();
+                    }
+                }
+                curid = next;
+                dir = ndir;
+                curndir = dir.rotate_cw();
+            }
+        }
+        best
     }
 }
 
