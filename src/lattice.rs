@@ -39,11 +39,6 @@ impl Neighbor {
     }
 }
 
-#[derive(Clone)]
-pub struct Lattice {
-    conn: Box<[[Neighbor; 6]]>,
-}
-
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Direction(u8);
 
@@ -101,7 +96,7 @@ impl Direction {
             3 => "LEFT",
             4 => "BOTTOM_LEFT",
             5 => "BOTTOM_RIGHT",
-            _ => panic!("Invalid direction"),
+            _ => panic!("Invalid direction. This should never happen."),
         }
     }
 }
@@ -118,6 +113,11 @@ impl IndexMut<Direction> for [Neighbor; 6] {
     fn index_mut(&mut self, dir: Direction) -> &mut Self::Output {
         &mut self[dir.0 as usize]
     }
+}
+
+#[derive(Clone)]
+pub struct Lattice {
+    conn: Box<[[Neighbor; 6]]>,
 }
 
 impl Lattice {

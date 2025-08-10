@@ -24,7 +24,7 @@ impl Display for Error {
 fn main() -> Result<(), Error> {
     use lattice::{Direction, *};
 
-    let solns = solve_greedy::<Graph>(4);
+    let solns = solve_greedy::<Graph>(5);
     println!("Found {}", solns.len());
     for soln in solns {
         println!("=============\n{}", soln);
