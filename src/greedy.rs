@@ -18,6 +18,7 @@ where
     let mut candidates = FixedBitSet::new();
     let mut lattice = Lattice::new(num_nodes);
     lattice.insert(0, Direction::RIGHT, 1);
+    graph.remove_edge(0, 1);
     let mut latnbs = Vec::new();
     let mut visitedbuf = Vec::new();
     let mut slots = Vec::new();
@@ -43,9 +44,9 @@ where
             found = true;
             break;
         }
-        if !found {
+        if !found || graph.is_empty() {
             out.push(lattice.clone());
         }
     }
-    todo!("Not Implemented")
+    out
 }

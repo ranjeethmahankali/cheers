@@ -3,6 +3,7 @@ mod greedy;
 mod lattice;
 
 use graph::{Graph, TGraph};
+use greedy::solve_greedy;
 use std::fmt::Display;
 
 #[derive(Debug)]
@@ -23,17 +24,23 @@ impl Display for Error {
 fn main() -> Result<(), Error> {
     use lattice::{Direction, *};
 
-    let mut lattice = Lattice::new(507);
-    lattice.insert(0, Direction::RIGHT, 1);
-    let mut visited = Vec::new();
-    let mut slots = Vec::new();
-    println!("{}\n===========================\n", lattice);
-    for id in 2u32..(lattice.len() as u32) {
-        lattice.empty_slots(&mut visited, &mut slots);
-        let (from, dir, _) = slots.last().unwrap();
-        lattice.insert(*from, *dir, id);
-        println!("{}\n===========================\n", lattice);
+    let solns = solve_greedy::<Graph>(3);
+    println!("Found {}", solns.len());
+    for soln in solns {
+        println!("=============\n{}", soln);
     }
+
+    // let mut lattice = Lattice::new(507);
+    // lattice.insert(0, Direction::RIGHT, 1);
+    // let mut visited = Vec::new();
+    // let mut slots = Vec::new();
+    // println!("{}\n===========================\n", lattice);
+    // for id in 2u32..(lattice.len() as u32) {
+    //     lattice.empty_slots(&mut visited, &mut slots);
+    //     let (from, dir, _) = slots.last().unwrap();
+    //     lattice.insert(*from, *dir, id);
+    //     println!("{}\n===========================\n", lattice);
+    // }
 
     // let mut our_lattice = Lattice::new(9);
     // our_lattice.insert(0, Direction::TOP_RIGHT, 1);
