@@ -1,5 +1,5 @@
 use std::{
-    fmt::Debug,
+    fmt::{Debug, Display},
     num::NonZeroU32,
     ops::{Index, IndexMut},
 };
@@ -39,15 +39,13 @@ pub struct Direction(u8);
 
 impl Debug for Direction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(match self.0 {
-            0 => "RIGHT",
-            1 => "TOP_RIGHT",
-            2 => "TOP_LEFT",
-            3 => "LEFT",
-            4 => "BOTTOM_LEFT",
-            5 => "BOTTOM_RIGHT",
-            _ => panic!("Invalid direction"),
-        })
+        f.write_str(self.as_str())
+    }
+}
+
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
@@ -72,17 +70,29 @@ impl Direction {
         Self((self.0 + 3) % 6)
     }
 
-    const fn rotate_cw(self) -> Self {
+    const fn rotate_ccw(self) -> Self {
         Self((self.0 + 1) % 6)
     }
 
-    const fn rotate_ccw(self) -> Self {
+    const fn rotate_cw(self) -> Self {
         Self((self.0 + 5) % 6)
     }
 
     const fn offset(&self) -> (isize, isize) {
         const OFFSETS: [(isize, isize); 6] = [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
         return OFFSETS[self.0 as usize];
+    }
+
+    const fn as_str(&self) -> &str {
+        match self.0 {
+            0 => "RIGHT",
+            1 => "TOP_RIGHT",
+            2 => "TOP_LEFT",
+            3 => "LEFT",
+            4 => "BOTTOM_LEFT",
+            5 => "BOTTOM_RIGHT",
+            _ => panic!("Invalid direction"),
+        }
     }
 }
 
@@ -301,7 +311,7 @@ impl Lattice {
     }
 }
 
-impl std::fmt::Display for Lattice {
+impl Display for Lattice {
     /*
     The hexagonal grids are stored in a coordinate system where the axes are
     squished together to 60 degrees.
