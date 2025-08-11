@@ -1,4 +1,5 @@
 use std::{
+    fmt::{Debug, Display},
     num::NonZeroU32,
     ops::{Index, IndexMut},
 };
@@ -7,11 +8,20 @@ use std::{
 // for the two states when the vertex does and does not exist in the slot.
 #[repr(transparent)]
 #[derive(Copy, Clone)]
-struct Neighbor(Option<NonZeroU32>);
+pub struct Neighbor(Option<NonZeroU32>);
 
 impl Default for Neighbor {
     fn default() -> Self {
         Self(None)
+    }
+}
+
+impl Debug for Neighbor {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.get() {
+            Some(id) => write!(f, "{id}"),
+            None => write!(f, "NONE"),
+        }
     }
 }
 
@@ -20,7 +30,7 @@ impl Neighbor {
         self.0 = NonZeroU32::new(id ^ u32::MAX);
     }
 
-    fn get(&self) -> Option<u32> {
+    pub fn get(&self) -> Option<u32> {
         self.0.map(|v| v.get() ^ u32::MAX)
     }
 
@@ -29,12 +39,20 @@ impl Neighbor {
     }
 }
 
-pub struct Lattice {
-    conn: Box<[[Neighbor; 6]]>,
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct Direction(u8);
+
+impl Debug for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub struct Direction(u8);
+impl Display for Direction {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
 
 impl Direction {
     pub const RIGHT: Self = Self(0);
@@ -57,17 +75,29 @@ impl Direction {
         Self((self.0 + 3) % 6)
     }
 
-    const fn rotate_cw(self) -> Self {
+    const fn rotate_ccw(self) -> Self {
         Self((self.0 + 1) % 6)
     }
 
-    const fn rotate_ccw(self) -> Self {
+    const fn rotate_cw(self) -> Self {
         Self((self.0 + 5) % 6)
     }
 
     const fn offset(&self) -> (isize, isize) {
         const OFFSETS: [(isize, isize); 6] = [(1, 0), (0, 1), (-1, 1), (-1, 0), (0, -1), (1, -1)];
         return OFFSETS[self.0 as usize];
+    }
+
+    const fn as_str(&self) -> &str {
+        match self.0 {
+            0 => "RIGHT",
+            1 => "TOP_RIGHT",
+            2 => "TOP_LEFT",
+            3 => "LEFT",
+            4 => "BOTTOM_LEFT",
+            5 => "BOTTOM_RIGHT",
+            _ => panic!("Invalid direction. This should never happen."),
+        }
     }
 }
 
@@ -85,6 +115,11 @@ impl IndexMut<Direction> for [Neighbor; 6] {
     }
 }
 
+#[derive(Clone)]
+pub struct Lattice {
+    conn: Box<[[Neighbor; 6]]>,
+}
+
 impl Lattice {
     pub fn new(num_nodes: usize) -> Self {
         Self {
@@ -96,10 +131,16 @@ impl Lattice {
         self.conn.len()
     }
 
+    pub fn clear(&mut self) {
+        for nbs in &mut self.conn {
+            nbs.fill(Neighbor::default());
+        }
+    }
+
     fn step_loop_ccw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
         let nb = self.neighbor(node_id, direction)?;
         let stop = direction.opposite();
-        let mut dir = direction.opposite().rotate_ccw();
+        let mut dir = stop.rotate_ccw();
         let mut rotations = 1;
         while dir != stop {
             if self.neighbor(nb, dir).is_some() {
@@ -108,13 +149,13 @@ impl Lattice {
             dir = dir.rotate_ccw();
             rotations += 1;
         }
-        None
+        Some((nb, stop, 6))
     }
 
     fn step_loop_cw(&self, node_id: u32, direction: Direction) -> Option<(u32, Direction, u8)> {
         let nb = self.neighbor(node_id, direction)?;
         let stop = direction.opposite();
-        let mut dir = direction.opposite().rotate_cw();
+        let mut dir = stop.rotate_cw();
         let mut rotations = 1;
         while dir != stop {
             if self.neighbor(nb, dir).is_some() {
@@ -123,14 +164,14 @@ impl Lattice {
             dir = dir.rotate_cw();
             rotations += 1;
         }
-        None
+        Some((nb, stop, 6))
     }
 
     fn neighbor(&self, from: u32, dir: Direction) -> Option<u32> {
         self.conn[from as usize][dir].get()
     }
 
-    fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
+    pub fn neighbors(&self, id: u32) -> impl Iterator<Item = u32> {
         self.conn[id as usize].iter().filter_map(|n| n.get())
     }
 
@@ -141,7 +182,7 @@ impl Lattice {
             .filter_map(|(n, &d)| n.get().map(|n| (n, d)))
     }
 
-    fn contains(&self, id: u32) -> bool {
+    pub fn contains(&self, id: u32) -> bool {
         self.neighbors(id).next().is_some()
     }
 
@@ -203,12 +244,93 @@ impl Lattice {
     }
 
     /// Return the empty slot with the highest valence and it's neighbors.
-    fn best_empty_slot() -> ((u32, Direction), [Neighbor; 6]) {
-        todo!("Not Implemented")
+    ///
+    /// `visited` and `nb_buf` are temporary buffers used in this function,
+    /// passed in by the caller to avoid allocations.
+    pub fn empty_slots(
+        &self,
+        visited: &mut Vec<bool>,
+        out: &mut Vec<(u32, Direction, [Neighbor; 6])>,
+    ) {
+        visited.clear();
+        visited.resize(self.len(), false);
+        out.clear();
+        for id in 0u32..(self.len() as u32) {
+            if visited[id as usize] {
+                continue;
+            }
+            // Find boundary edge.
+            let dir = match self
+                .neighbors_with_dirs(id)
+                .find(|(_, dir)| self.neighbor(id, dir.rotate_cw()).is_none())
+            {
+                Some((_, dir)) => dir,
+                None => continue,
+            };
+            let mut curid = id;
+            let mut dir = dir;
+            // If we happen to be in the middle of a concavity, we don't want to
+            // start counting from here.  So we try to walk backwards to the
+            // start of this concavity before we start counting.
+            curid = self
+                .neighbor(curid, dir)
+                .expect("Topology is broken if we don't get this");
+            dir = dir.opposite();
+            loop {
+                let (next, ndir, nrot) = self
+                    .step_loop_cw(curid, dir)
+                    .expect("We're on the boundary loop. This should never happen");
+                match nrot {
+                    1 => panic!("This implies broken topology. This should never happen"),
+                    2 => {
+                        curid = next;
+                        dir = ndir;
+                    }
+                    _ => break,
+                }
+            }
+            curid = self
+                .neighbor(curid, dir)
+                .expect("Topology is broken if we don't get this");
+            dir = dir.opposite();
+            let mut curndir = dir.rotate_cw();
+            let mut curnb = [Neighbor::default(); 6];
+            loop {
+                visited[curid as usize] = true;
+                curnb[curndir.opposite()].put(curid);
+                let (next, ndir, nrot) = self
+                    .step_loop_ccw(curid, dir)
+                    .expect("This is a boundary edge, so the loop step should never fail");
+                match nrot {
+                    0 | 1 => panic!("This implies broken topology. This should never happen"),
+                    2 => {} // Keep going.
+                    _ => {
+                        curnb[curndir.opposite().rotate_cw()].put(next);
+                        out.push((curid, curndir, curnb));
+                        curnb.fill(Neighbor::default());
+                        {
+                            let mut odir = dir.opposite();
+                            for _ in 0..(nrot - 2) {
+                                odir = odir.rotate_ccw();
+                                let mut nbs = [Neighbor::default(); 6];
+                                nbs[odir.opposite()].put(next);
+                                out.push((next, odir, nbs));
+                            }
+                        }
+                    }
+                }
+                if next == id {
+                    break;
+                }
+                curid = next;
+                dir = ndir;
+                curndir = dir.rotate_cw();
+            }
+        }
     }
 }
 
-impl std::fmt::Display for Lattice {
+impl Display for Lattice {
     /*
     The hexagonal grids are stored in a coordinate system where the axes are
     squished together to 60 degrees.
