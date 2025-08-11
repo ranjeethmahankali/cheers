@@ -514,10 +514,9 @@ mod test {
     }
 
     #[test]
-    fn test_neighbor_put_get() {
-        let test_values = [0, 1, 42, 1000, u32::MAX / 2, u32::MAX - 1];
-
-        for &id in &test_values {
+    fn t_neighbor_put_get() {
+        let values = [0, 1, 42, 1000, u32::MAX / 2, u32::MAX - 1];
+        for &id in &values {
             let mut neighbor = Neighbor::default();
             assert!(!neighbor.get().is_some());
             neighbor.put(id);
@@ -526,14 +525,14 @@ mod test {
     }
 
     #[test]
-    fn test_neighbor_max_value_edge_case() {
+    fn t_neighbor_max_value_edge_case() {
         let mut neighbor = Neighbor::default();
         neighbor.put(u32::MAX);
         assert!(neighbor.get().is_none());
     }
 
     #[test]
-    fn test_neighbor_overwrite() {
+    fn t_neighbor_overwrite() {
         let mut neighbor = Neighbor::default();
         neighbor.put(42);
         assert_eq!(neighbor.get(), Some(42));
@@ -542,7 +541,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_empty_lattice() {
+    fn t_print_empty_lattice() {
         let lattice = Lattice::new(5);
         check_lattice_consistency(&lattice);
         let output = format!("{}", lattice);
@@ -550,7 +549,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_single_node_lattice() {
+    fn t_print_single_node_lattice() {
         let mut lattice = Lattice::new(1);
         // Insert node 0 to itself to create a self-loop
         lattice.insert(0, Direction::RIGHT, 0); // Has no effect.
@@ -559,7 +558,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_two_node_connection() {
+    fn t_print_two_node_connection() {
         let mut lattice = Lattice::new(2);
         lattice.insert(0, Direction::RIGHT, 1);
         check_lattice_consistency(&lattice);
@@ -567,7 +566,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_triangle_formation() {
+    fn t_print_triangle_formation() {
         let mut lattice = Lattice::new(3);
         // First connect two nodes
         lattice.insert(0, Direction::RIGHT, 1);
@@ -584,7 +583,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_linear_chain() {
+    fn t_print_linear_chain() {
         let mut lattice = Lattice::new(4);
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(1, Direction::RIGHT, 2);
@@ -601,7 +600,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_disjoint_components() {
+    fn t_print_disjoint_components() {
         let mut lattice = Lattice::new(6);
         // Create first triangle component
         lattice.insert(0, Direction::RIGHT, 1);
@@ -621,7 +620,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_mixed_components() {
+    fn t_print_mixed_components() {
         let mut lattice = Lattice::new(5);
         // Build mixed triangle and linear components
         lattice.insert(0, Direction::RIGHT, 1);
@@ -642,7 +641,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_star_pattern() {
+    fn t_print_star_pattern() {
         let mut lattice = Lattice::new(7);
         // Create star pattern with center node connected in all directions
         lattice.insert(0, Direction::RIGHT, 1);
@@ -664,7 +663,7 @@ mod test {
     }
 
     #[test]
-    fn test_print_non_contiguous_nodes() {
+    fn t_print_non_contiguous_nodes() {
         let mut lattice = Lattice::new(10);
         // Test lattice with gaps in node IDs
         lattice.insert(0, Direction::RIGHT, 2);
@@ -691,31 +690,28 @@ mod test {
     }
 
     #[test]
-    fn test_edges_empty_lattice() {
+    fn t_edges_empty_lattice() {
         let lattice = Lattice::new(5);
         let edges: Vec<_> = lattice.edges().collect();
         assert!(edges.is_empty(), "Empty lattice should have no edges");
     }
 
     #[test]
-    fn test_edges_single_edge() {
+    fn t_edges_single_edge() {
         let mut lattice = Lattice::new(2);
         lattice.insert(0, Direction::RIGHT, 1);
-
         let edges: Vec<_> = lattice.edges().collect();
         assert_eq!(edges.len(), 1, "Single connection should produce one edge");
         assert_eq!(edges[0], (0, 1), "Edge should be (0, 1)");
     }
 
     #[test]
-    fn test_edges_triangle() {
+    fn t_edges_triangle() {
         let mut lattice = Lattice::new(3);
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(0, Direction::TOP_RIGHT, 2);
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         assert_eq!(edges.len(), 3, "Triangle should have 3 edges");
         assert_eq!(
             edges,
@@ -725,15 +721,13 @@ mod test {
     }
 
     #[test]
-    fn test_edges_linear_chain() {
+    fn t_edges_linear_chain() {
         let mut lattice = Lattice::new(4);
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(1, Direction::RIGHT, 2);
         lattice.insert(2, Direction::RIGHT, 3);
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         assert_eq!(
             edges.len(),
             3,
@@ -747,7 +741,7 @@ mod test {
     }
 
     #[test]
-    fn test_edges_disjoint_components() {
+    fn t_edges_disjoint_components() {
         let mut lattice = Lattice::new(6);
         // First component: triangle
         lattice.insert(0, Direction::RIGHT, 1);
@@ -756,10 +750,8 @@ mod test {
         lattice.insert(3, Direction::RIGHT, 4);
         // Third component: single edge
         lattice.insert(5, Direction::RIGHT, 5); // Should have no effect
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         assert_eq!(edges.len(), 4, "Two components should have 4 total edges");
         assert_eq!(
             edges,
@@ -769,7 +761,7 @@ mod test {
     }
 
     #[test]
-    fn test_edges_star_pattern() {
+    fn t_edges_star_pattern() {
         let mut lattice = Lattice::new(7);
         // Create star pattern with center node 0
         lattice.insert(0, Direction::RIGHT, 1);
@@ -778,10 +770,8 @@ mod test {
         lattice.insert(0, Direction::LEFT, 4);
         lattice.insert(0, Direction::BOTTOM_LEFT, 5);
         lattice.insert(0, Direction::BOTTOM_RIGHT, 6);
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         // The insert function creates additional edges to maintain triangular lattice structure
         // Actual edges created in hexagonal pattern around center node 0
         let expected = vec![
@@ -810,11 +800,10 @@ mod test {
     }
 
     #[test]
-    fn test_edges_no_duplicates() {
+    fn t_edges_no_duplicates() {
         let mut lattice = Lattice::new(3);
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(1, Direction::LEFT, 0); // This should be redundant due to bidirectional nature
-
         let edges: Vec<_> = lattice.edges().collect();
         assert_eq!(
             edges.len(),
@@ -829,7 +818,7 @@ mod test {
     }
 
     #[test]
-    fn test_edges_canonical_order() {
+    fn t_edges_canonical_order() {
         let mut lattice = Lattice::new(5);
         // Create simple separate edges to test canonical ordering
         lattice.insert(4, Direction::RIGHT, 1); // Edge (1,4)
@@ -848,7 +837,7 @@ mod test {
     }
 
     #[test]
-    fn test_edges_complex_pattern() {
+    fn t_edges_complex_pattern() {
         let mut lattice = Lattice::new(6);
         // Create triangle: 0-1-2
         lattice.insert(0, Direction::RIGHT, 1);
@@ -861,7 +850,6 @@ mod test {
 
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         let expected = vec![(0, 1), (0, 2), (1, 2), (3, 4), (4, 5)];
         assert_eq!(
             edges.len(),
@@ -875,19 +863,16 @@ mod test {
     }
 
     #[test]
-    fn test_edges_after_removal() {
+    fn t_edges_after_removal() {
         let mut lattice = Lattice::new(4);
         // Create a linear chain
         lattice.insert(0, Direction::RIGHT, 1);
         lattice.insert(1, Direction::RIGHT, 2);
         lattice.insert(2, Direction::RIGHT, 3);
-
         // Remove middle node
         lattice.remove(1);
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         assert_eq!(
             edges.len(),
             1,
@@ -897,16 +882,14 @@ mod test {
     }
 
     #[test]
-    fn test_edges_sparse_ids() {
+    fn t_edges_sparse_ids() {
         let mut lattice = Lattice::new(10);
         // Use non-contiguous node IDs with separate components
         lattice.insert(1, Direction::RIGHT, 3); // Component 1: 1-3
         lattice.insert(5, Direction::RIGHT, 7); // Component 2: 5-7
         lattice.insert(8, Direction::RIGHT, 9); // Component 3: 8-9
-
         let mut edges: Vec<_> = lattice.edges().collect();
         edges.sort();
-
         assert_eq!(edges.len(), 3, "Three separate edges with sparse IDs");
         assert_eq!(
             edges,

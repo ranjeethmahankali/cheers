@@ -64,8 +64,9 @@ impl TGraph for Graph {
 
     fn find_candidates(&self, required: &[u32], candidates: &mut FixedBitSet) {
         candidates.clear();
-        candidates.grow_and_insert(self.n_nodes);
+        candidates.grow(self.n_nodes);
         if required.is_empty() {
+            candidates.insert_range(0..self.n_nodes);
             return;
         }
         // Start with neighbors of first required node
@@ -149,7 +150,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_complete_graph_creation() {
+    fn t_complete_graph_creation() {
         let graph = Graph::new_complete(4);
         assert_eq!(graph.num_edges(), 6); // K4 has 6 edges
         // Check all pairs are connected
@@ -165,7 +166,7 @@ mod tests {
     }
 
     #[test]
-    fn test_edge_removal() {
+    fn t_edge_removal() {
         let mut graph = Graph::new_complete(3);
         assert_eq!(graph.num_edges(), 3); // K3 has 3 edges
         graph.remove_edge(0, 1);
@@ -177,7 +178,7 @@ mod tests {
     }
 
     #[test]
-    fn test_valence_calculation() {
+    fn t_valence_calculation() {
         let graph = Graph::new_complete(4);
         // In K4, every node has valence 3
         for i in 0..4 {
@@ -186,7 +187,7 @@ mod tests {
     }
 
     #[test]
-    fn test_find_candidates() {
+    fn t_find_candidates() {
         let graph = Graph::new_complete(4);
         let mut candidates = FixedBitSet::with_capacity(4);
         // All nodes should be candidates when no requirements
@@ -203,7 +204,7 @@ mod tests {
     }
 
     #[test]
-    fn test_is_empty() {
+    fn t_is_empty() {
         let mut graph = Graph::new_complete(2);
         assert!(!graph.is_empty());
         graph.remove_edge(0, 1);
