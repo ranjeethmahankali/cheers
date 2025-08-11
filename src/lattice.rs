@@ -403,8 +403,12 @@ impl Lattice {
                 }
             }
             // Check that no node references itself as a neighbor
-            for neighbor in self.neighbors(node) {
-                assert_ne!(neighbor, node, "Node {} has itself as a neighbor", node);
+            for (nb, dir) in self.neighbors_with_dirs(node) {
+                assert_ne!(nb, node, "Node {} has itself as a neighbor", node);
+                assert_eq!(
+                    self.neighbor(node, dir.rotate_ccw()),
+                    self.neighbor(nb, dir.opposite().rotate_cw())
+                );
             }
         }
     }
@@ -465,7 +469,6 @@ impl Display for Lattice {
                 |(xmin, ymin, xmax, ymax), &(x, y, _node)| {
                     let x = x * 4 + 2 * y;
                     let y = y * 2;
-                    eprintln!("When doing min: {x}, {y} for node {_node}");
                     (
                         xmin.min(x - 1),
                         ymin.min(y - 1),
@@ -474,13 +477,11 @@ impl Display for Lattice {
                     )
                 },
             );
-            eprintln!("Bounds: {xmin}, {_ymin}, {_xmax}, {_ymax}");
             for row in component_nodes.chunk_by(|(_, ay1, _), (_, ay2, _)| ay1 == ay2) {
                 let mut xoff = 0usize;
                 for &(ix, iy, node) in row {
                     let has_right = self.neighbor(node, Direction::RIGHT).is_some();
                     let x = ((ix * 4 + 2 * iy) - xmin) as usize;
-                    eprintln!("node {node}; ({ix}, {iy}); {xmin}; {x} and {xoff}");
                     for _ in 0..(x - xoff) {
                         write!(f, " ")?;
                     }
