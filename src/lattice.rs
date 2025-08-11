@@ -175,6 +175,15 @@ impl Lattice {
         self.conn[id as usize].iter().filter_map(|n| n.get())
     }
 
+    pub fn edges(&self) -> impl Iterator<Item = (u32, u32)> {
+        (0..self.len()).flat_map(|id| {
+            self.conn[id]
+                .iter()
+                .filter_map(move |nb| nb.get().map(|nb| (id as u32, nb)))
+                .filter(|(a, b)| a < b)
+        })
+    }
+
     fn neighbors_with_dirs(&self, id: u32) -> impl Iterator<Item = (u32, Direction)> {
         self.conn[id as usize]
             .iter()

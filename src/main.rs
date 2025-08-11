@@ -2,11 +2,25 @@ mod graph;
 mod greedy;
 mod lattice;
 
-use graph::Graph;
+use graph::{Graph, TGraph};
 use greedy::solve_greedy;
+use lattice::Lattice;
+
+fn verify(num_nodes: usize, solutions: &[Lattice]) {
+    let mut graph = Graph::new_complete(num_nodes);
+    for (a, b) in solutions.iter().flat_map(|lat| lat.edges()) {
+        graph.remove_edge(a, b);
+    }
+    assert!(
+        graph.is_empty(),
+        "The set of solutions didn't cover all the edges of the complete graph"
+    );
+}
 
 fn main() {
-    let solns = solve_greedy::<Graph>(6);
+    let num_nodes = 10;
+    let solns = solve_greedy::<Graph>(num_nodes);
+    verify(num_nodes, &solns);
     println!("Found {}", solns.len());
     for soln in solns {
         println!("=============\n{}", soln);
