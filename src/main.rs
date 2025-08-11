@@ -18,7 +18,7 @@ fn verify(num_nodes: usize, solutions: &[Lattice]) {
 }
 
 fn main() {
-    let num_nodes = 10;
+    let num_nodes = 19;
     let solns = solve_greedy::<Graph>(num_nodes);
     verify(num_nodes, &solns);
     println!("Found {}", solns.len());

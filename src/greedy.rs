@@ -45,34 +45,57 @@ where
             break;
         }
         if !found {
-            out.push(lattice.clone());
-            lattice.clear();
-            match (0..(graph.num_nodes() as u32)).fold(
-                None,
-                |best: Option<(u32, usize)>, current| {
-                    let cval = graph.valence(current);
+            // Find nodes that are not participating, that can form their own
+            // disjoint sub-lattice.
+            if let Some((aid, bid, _)) = (0..num_nodes)
+                .filter(|id| !lattice.contains(*id as u32))
+                .flat_map(|id| {
+                    graph
+                        .edges(id as u32)
+                        .filter(|&nb| !lattice.contains(nb))
+                        .map(move |nb| (id as u32, nb))
+                })
+                .filter(|(a, b)| a < b)
+                .fold(None, |best, (a, b)| {
+                    let curr_vsum = graph.valence(a) + graph.valence(b);
                     match best {
-                        Some((best, val)) if val >= cval => Some((best, val)),
-                        _ => Some((current, cval)),
+                        Some((l, r, vsum)) if vsum >= curr_vsum => Some((l, r, vsum)),
+                        _ => Some((a, b, curr_vsum)),
                     }
-                },
-            ) {
-                Some((best, _)) => {
-                    match graph.edges(best).fold(None, |nbest, current| {
+                })
+            {
+                lattice.insert(aid, Direction::RIGHT, bid);
+                graph.remove_edge(aid, bid);
+            } else {
+                out.push(lattice.clone());
+                lattice.clear();
+                match (0..(graph.num_nodes() as u32)).fold(
+                    None,
+                    |best: Option<(u32, usize)>, current| {
                         let cval = graph.valence(current);
-                        match nbest {
-                            Some((nbest, nval)) if nval >= cval => Some((nbest, nval)),
+                        match best {
+                            Some((best, val)) if val >= cval => Some((best, val)),
                             _ => Some((current, cval)),
                         }
-                    }) {
-                        Some((nbest, _)) => {
-                            lattice.insert(best, Direction::RIGHT, nbest);
-                            graph.remove_edge(best, nbest);
+                    },
+                ) {
+                    Some((best, _)) => {
+                        match graph.edges(best).fold(None, |nbest, current| {
+                            let cval = graph.valence(current);
+                            match nbest {
+                                Some((nbest, nval)) if nval >= cval => Some((nbest, nval)),
+                                _ => Some((current, cval)),
+                            }
+                        }) {
+                            Some((nbest, _)) => {
+                                lattice.insert(best, Direction::RIGHT, nbest);
+                                graph.remove_edge(best, nbest);
+                            }
+                            None => break,
                         }
-                        None => break,
                     }
+                    None => break,
                 }
-                None => break,
             }
         }
         if graph.is_empty() {
