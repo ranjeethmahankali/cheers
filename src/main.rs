@@ -7,6 +7,9 @@ use greedy::solve_greedy;
 use lattice::Lattice;
 
 fn verify(num_nodes: usize, solutions: &[Lattice]) {
+    for lat in solutions.iter() {
+        lat.validate();
+    }
     let mut graph = Graph::new_complete(num_nodes);
     for (a, b) in solutions.iter().flat_map(|lat| lat.edges()) {
         graph.remove_edge(a, b);
@@ -18,7 +21,7 @@ fn verify(num_nodes: usize, solutions: &[Lattice]) {
 }
 
 fn main() {
-    let num_nodes = 19;
+    let num_nodes = 20;
     let solns = solve_greedy::<Graph>(num_nodes);
     verify(num_nodes, &solns);
     println!("Found {}", solns.len());
